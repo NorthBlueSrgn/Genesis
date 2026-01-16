@@ -1,0 +1,110 @@
+
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@400;600;700&family=Permanent+Marker&family=Nanum+Pen+Script&family=JetBrains+Mono:wght@400;700&display=swap');
+
+:root {
+  --color-bg-deep: #010204;
+  --color-bg-medium: #05080c;
+  --color-border: #141b24;
+  --color-accent: #a855f7;
+  --color-accent-dim: #581c87;
+  --color-tactical-cyan: #22d3ee;
+  --color-tactical-green: #4ade80;
+  --color-tactical-amber: #fbbf24;
+  --blueprint-grid: rgba(34, 211, 238, 0.04);
+}
+
+body {
+  margin: 0;
+  font-family: 'Rajdhani', sans-serif;
+  background-color: var(--color-bg-deep);
+  color: #c9d1d9;
+  overflow: hidden;
+  position: relative;
+}
+
+/* CRT DISTORTION HUD - VIGNETTE ONLY (NO NOISE) */
+.vignette-hud {
+  position: fixed;
+  inset: 0;
+  box-shadow: inset 0 0 150px rgba(0,0,0,0.9), inset 0 0 50px rgba(168, 85, 247, 0.05);
+  pointer-events: none;
+  z-index: 9998;
+}
+
+.hud-bracket {
+  position: absolute;
+  width: 40px;
+  height: 40px;
+  border: 1px solid rgba(168, 85, 247, 0.2);
+  opacity: 0.5;
+}
+
+/* SCHEMATIC ELEMENTS */
+.blueprint-bg {
+  background-image: 
+    linear-gradient(var(--blueprint-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--blueprint-grid) 1px, transparent 1px);
+  background-size: 50px 50px;
+}
+
+.logic-trace-vertical {
+  position: absolute;
+  left: 28px;
+  top: 40px;
+  bottom: -40px;
+  width: 2px;
+  background-image: linear-gradient(to bottom, transparent, #1e293b 20%, #1e293b 80%, transparent);
+  border-left: 1px dashed rgba(255,255,255,0.05);
+  z-index: 0;
+}
+
+/* GLITCH & FLICKER */
+.animate-flicker {
+  animation: flicker 0.2s infinite;
+}
+
+@keyframes flicker {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.98; }
+}
+
+.chromatic-text {
+  text-shadow: 1px 0 0 rgba(255,0,0,0.3), -1px 0 0 rgba(0,255,255,0.3);
+}
+
+.hud-card {
+  position: relative;
+  background: rgba(2, 4, 8, 0.95);
+  border: 1px solid var(--color-border);
+  backdrop-blur: 8px;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.9);
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 3px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #1e293b;
+  border-radius: 10px;
+}
+
+.btn-primary {
+  background: var(--color-accent);
+  color: white;
+  font-family: 'Orbitron', sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.3em;
+  font-weight: 900;
+  transition: all 0.2s;
+  border: 1px solid rgba(255,255,255,0.1);
+  clip-path: polygon(5% 0, 100% 0, 100% 85%, 95% 100%, 0 100%, 0 15%);
+}
+
+.btn-primary:hover {
+  filter: brightness(1.2);
+  box-shadow: 0 0 25px var(--color-accent);
+  transform: scale(1.02);
+}

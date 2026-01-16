@@ -1,0 +1,16 @@
+{
+  "name": "Genesis Protocol",
+  "short_name": "Genesis",
+  "description": "An immersive self-improvement application set in a world where a secret government program has leaked. It helps users transform their lives by reinforcing daily habits, guiding them from Rank E to SSS through structured protocols and an AI companion.",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#0a0a0a",
+  "theme_color": "#a855f7",
+  "icons": [
+    {
+      "src": "/icon.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
