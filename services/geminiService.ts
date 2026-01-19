@@ -5,7 +5,7 @@ import { GameState, Rank, Stat, ChatMessage, Mission, PromotionExam, LoreEntry, 
 import { RANKS } from "../constants";
 import { CREATIVITY_ASSESSMENT_SYSTEM_PROMPT } from '../data/creativityAssessmentFinal';
 
-const MODEL_NAME = 'gemini-3-pro-preview'; 
+const MODEL_NAME = 'gemini-2-flash'; 
 
 const getCleanJson = (text: string) => {
     try {
