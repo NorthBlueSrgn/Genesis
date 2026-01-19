@@ -41,8 +41,8 @@ const SingularityPlot: React.FC<{ talentClass: TalentClass; obsessionLevel: Obse
         'Compulsive': { x: 95, label: 'COMPULSIVE' }
     };
 
-    const userX = obsessionMap[obsessionLevel].x;
-    const userY = talentMap[talentClass].y;
+    const userX = obsessionMap[obsessionLevel]?.x || 50;
+    const userY = talentMap[talentClass]?.y || 50;
 
     return (
         <div className="relative w-full h-[350px] bg-black border border-gray-800 rounded-sm overflow-hidden">
@@ -228,7 +228,7 @@ export const ClassifiedDossier: React.FC<ClassifiedDossierProps> = ({ report, on
                             <h3 className="text-2xl font-black font-orbitron text-white tracking-widest uppercase">{report.talentClass}</h3>
                             <div className="flex gap-2 mt-2">
                                 <span className="text-[8px] font-black border border-purple-500/50 px-2 py-0.5 text-purple-400 uppercase tracking-tighter">{report.rarityBand}</span>
-                                <span className="text-[8px] font-black border border-cyan-500/50 px-2 py-0.5 text-cyan-400 uppercase tracking-tighter">MBTI: {report.mbtiProfile.split(':')[0] || 'UNK'}</span>
+                                <span className="text-[8px] font-black border border-cyan-500/50 px-2 py-0.5 text-cyan-400 uppercase tracking-tighter">MBTI: {report.mbtiProfile ? report.mbtiProfile.split(':')[0] : 'UNK'}</span>
                             </div>
                         </div>
 
@@ -243,7 +243,7 @@ export const ClassifiedDossier: React.FC<ClassifiedDossierProps> = ({ report, on
                                 <div className="absolute inset-0 bg-film-grain !opacity-[0.03]" />
                                 <span className="text-[8px] text-gray-500 font-black uppercase tracking-widest flex items-center gap-1"><UserCheck size={10} /> Talent Class</span>
                                 <div className="text-xl font-black font-orbitron text-purple-400">{report.talentClass.toUpperCase()}</div>
-                                <div className="text-[8px] text-gray-600 font-bold uppercase italic mt-1 tracking-tighter">Growth_Multiplier: x1.{report.talentDna.LV.toString().split('.')[1] || '4'}</div>
+                                <div className="text-[8px] text-gray-600 font-bold uppercase italic mt-1 tracking-tighter">Growth_Multiplier: x{(report.talentDna?.LV ? (1 + report.talentDna.LV).toFixed(1) : '1.0')}</div>
                             </div>
                             <div className="bg-black border border-gray-800 p-4 flex flex-col justify-between group hover:border-red-500/50 transition-colors relative overflow-hidden">
                                 <div className="absolute inset-0 bg-film-grain !opacity-[0.03]" />
@@ -308,18 +308,18 @@ export const ClassifiedDossier: React.FC<ClassifiedDossierProps> = ({ report, on
                             <div className="flex-grow">
                                 <ResponsiveContainer width="100%" height={200}>
                                     <BarChart data={[
-                                        { name: 'Potential', value: Math.round(report.talentDna.BP * 100), fill: '#a855f7' },
-                                        { name: 'Velocity', value: Math.round(report.talentDna.LV * 100), fill: '#06b6d4' },
-                                        { name: 'Drive', value: Math.round(report.talentDna.DR * 100), fill: '#f97316' }
+                                        { name: 'Potential', value: Math.round((report.talentDna?.BP || 0.5) * 100), fill: '#a855f7' },
+                                        { name: 'Velocity', value: Math.round((report.talentDna?.LV || 0.5) * 100), fill: '#06b6d4' },
+                                        { name: 'Drive', value: Math.round((report.talentDna?.DR || 0.5) * 100), fill: '#f97316' }
                                     ]}>
                                         <CartesianGrid strokeDasharray="3,3" stroke="#333" />
                                         <XAxis dataKey="name" tick={{ fill: '#666', fontSize: 10, fontWeight: 'bold' }} />
                                         <YAxis domain={[0, 100]} tick={{ fill: '#666', fontSize: 9 }} />
                                         <Bar dataKey="value" radius={[4, 4, 0, 0]}>
                                             {[
-                                                { name: 'Potential', value: Math.round(report.talentDna.BP * 100), fill: '#a855f7' },
-                                                { name: 'Velocity', value: Math.round(report.talentDna.LV * 100), fill: '#06b6d4' },
-                                                { name: 'Drive', value: Math.round(report.talentDna.DR * 100), fill: '#f97316' }
+                                                { name: 'Potential', value: Math.round((report.talentDna?.BP || 0.5) * 100), fill: '#a855f7' },
+                                                { name: 'Velocity', value: Math.round((report.talentDna?.LV || 0.5) * 100), fill: '#06b6d4' },
+                                                { name: 'Drive', value: Math.round((report.talentDna?.DR || 0.5) * 100), fill: '#f97316' }
                                             ].map((entry, idx) => (
                                                 <Cell key={`cell-${idx}`} fill={entry.fill} />
                                             ))}
@@ -391,7 +391,9 @@ export const ClassifiedDossier: React.FC<ClassifiedDossierProps> = ({ report, on
                         </h3>
                         <div 
                             className="prose prose-invert max-w-none text-gray-300 font-mono text-sm leading-relaxed tracking-tight decrypting-text relative z-10"
-                            dangerouslySetInnerHTML={{ __html: report.centralInsight.replace(/\*\*(.*?)\*\*/g, '<span class="text-purple-400 font-black tracking-tighter px-1 bg-purple-950/20">$1</span>').replace(/\*(.*?)\*/g, '<i class="text-cyan-400">$1</i>') }}
+                            dangerouslySetInnerHTML={{ __html: (report.centralInsight || 'Profile analysis complete.')
+                                .replace(/\*\*(.*?)\*\*/g, '<span class="text-purple-400 font-black tracking-tighter px-1 bg-purple-950/20">$1</span>')
+                                .replace(/\*(.*?)\*/g, '<i class="text-cyan-400">$1</i>') }}
                         />
                     </div>
                 </section>
