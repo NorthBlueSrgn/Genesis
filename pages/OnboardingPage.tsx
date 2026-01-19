@@ -1,4 +1,3 @@
-
 // pages/OnboardingPage.tsx
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useGameState } from '../contexts/GameStateContext';
@@ -12,7 +11,7 @@ import { MBTI_QUESTIONS, calculateMBTI } from '../data/mbtiData';
 import { KNOWLEDGE_QUESTIONS_V2, getAdaptiveQuestionV2, checkAnswer, KnowledgeQuestionV2 } from '../data/knowledgeQuestionBankV2';
 import { CREATIVITY_ASSESSMENT_PROMPTS } from '../data/creativityAssessmentFinal';
 import { ArrowRight, Check, X, Timer, Terminal, BrainCircuit, Activity, SkipForward, Swords, Shield, Zap, Grid, Eye, Send, Lock, Scale, MousePointer2, AlertTriangle, Fingerprint, Shuffle, Circle, Square, Wind, Lightbulb, Target, Book, PenTool, Scale as Scales, StopCircle, Triangle, Hexagon, Star, HelpCircle, Diamond, Database, MousePointer, ShieldAlert, FileWarning, Cpu, Scan, RefreshCw, RotateCcw, Clock, MoveHorizontal, Info, ChevronRight, Signal, AlertOctagon, TrendingUp, SwordsIcon, Map as MapIcon, Flag, Globe, Landmark, UserCheck, Sparkles, Wand2, Activity as Pulse, Palette } from 'lucide-react';
-import { performTraitAnalysis, calculateCeilingRank, mapScoreToRank, calculateTalentDistribution, getPercentileForSubstat, calculateInitialResonanceVector, convertPercentileToSubstatValue, calculateScores, generateCodename, getPercentileForMetric, calculateSubstatsFromAllTests } from '../services/scoringService';
+import { performTraitAnalysis, calculateCeilingRank, mapScoreToRank, calculateTalentDistribution, getPercentileForSubstat, calculateInitialResonanceVector, convertPercentileToSubstatValue, calculateScores, generateCodename, getPercentileForMetric, calculateSubstatsFromAllTests, interpolate } from '../services/scoringService';
 import { ClassifiedDossier } from '../components/ClassifiedDossier';
 import { useToast } from '../components/ui/ToastProvider';
 import LabyrinthPage from './LabyrinthPage';
@@ -166,7 +165,15 @@ const FittsLawTest: React.FC<{ onComplete: (data: any) => void }> = ({ onComplet
     const [activeTarget, setActiveTarget] = useState<{ x: number, y: number, size: number } | null>(null);
     const [startTime, setStartTime] = useState(0);
     const [testStartTime] = useState(performance.now());
+    const [reactionTimes, setReactionTimes] = useState<number[]>([]);
+    const [accuracyByPhase, setAccuracyByPhase] = useState<Record<string, number[]>>({ early: [], mid: [], late: [] });
     const TOTAL_TARGETS = 16;
+
+    const getPhaseLabel = (targetNum: number): string => {
+        if (targetNum <= 5) return 'early';
+        if (targetNum <= 11) return 'mid';
+        return 'late';
+    };
 
     const getDifficulty = (targetNum: number): { size: number, moveDistance: number } => {
         // Progressive difficulty: size decreases exponentially
@@ -184,9 +191,37 @@ const FittsLawTest: React.FC<{ onComplete: (data: any) => void }> = ({ onComplet
     const spawnTarget = useCallback(() => {
         if (targets >= TOTAL_TARGETS) {
             const totalTime = (performance.now() - testStartTime) / 1000;
-            const accuracy = (TOTAL_TARGETS / (TOTAL_TARGETS + misses)) * 100;
+            const totalAttempts = TOTAL_TARGETS + misses;
+            const accuracy = (TOTAL_TARGETS / totalAttempts) * 100;
+            const avgReaction = reactionTimes.length > 0 ? reactionTimes.reduce((a, b) => a + b, 0) / reactionTimes.length : 0;
+            const rtStdDev = reactionTimes.length > 1
+                ? Math.sqrt(reactionTimes.reduce((sum, rt) => sum + Math.pow(rt - avgReaction, 2), 0) / reactionTimes.length)
+                : 0;
+            
+            // Detect fatigue: compare early vs late accuracy
+            const earlyAcc = accuracyByPhase.early.length > 0 
+                ? (accuracyByPhase.early.reduce((a, b) => a + b, 0) / accuracyByPhase.early.length)
+                : 50;
+            const lateAcc = accuracyByPhase.late.length > 0 
+                ? (accuracyByPhase.late.reduce((a, b) => a + b, 0) / accuracyByPhase.late.length)
+                : 50;
+            const fatigueDetected = earlyAcc - lateAcc > 15; // 15% drop = fatigue
+            
             const score = Math.max(0, (TOTAL_TARGETS / totalTime) * 10 * (accuracy / 100));
-            onComplete({ avgReactionMs: (totalTime * 1000) / TOTAL_TARGETS, accuracy, score });
+            
+            onComplete({ 
+                avgReactionMs: avgReaction,
+                rtVariability: rtStdDev,
+                reactionTimes,
+                fastestMs: Math.min(...reactionTimes),
+                slowestMs: Math.max(...reactionTimes),
+                accuracy, 
+                accuracyByPhase,
+                fatigueDetected,
+                score,
+                totalTime,
+                speedAccuracyScore: score * (accuracy / 100) // Weight accuracy
+            });
             return;
         }
 
@@ -200,16 +235,36 @@ const FittsLawTest: React.FC<{ onComplete: (data: any) => void }> = ({ onComplet
             size 
         });
         setStartTime(performance.now());
-    }, [targets, misses, testStartTime, onComplete]);
+    }, [targets, misses, reactionTimes, testStartTime, accuracyByPhase, onComplete]);
 
     const handleTargetClick = (e: React.MouseEvent) => { 
-        e.stopPropagation(); 
+        e.stopPropagation();
+        const reactionTime = performance.now() - startTime;
+        const phase = getPhaseLabel(targets);
+        
+        setReactionTimes(prev => [...prev, reactionTime]);
+        
+        // Track accuracy by phase
+        setAccuracyByPhase(prev => ({
+            ...prev,
+            [phase]: [...(prev[phase as keyof typeof prev] || []), 100]
+        }));
+        
         setTargets(t => t + 1); 
         setActiveTarget(null); 
     };
 
     const handleMiss = () => { 
-        if (activeTarget) setMisses(m => m + 1); 
+        if (activeTarget) {
+            const phase = getPhaseLabel(targets);
+            setMisses(m => m + 1);
+            
+            // Track accuracy by phase
+            setAccuracyByPhase(prev => ({
+                ...prev,
+                [phase]: [...(prev[phase as keyof typeof prev] || []), 0]
+            }));
+        }
     };
 
     useEffect(() => { 
@@ -238,26 +293,106 @@ const FittsLawTest: React.FC<{ onComplete: (data: any) => void }> = ({ onComplet
 };
 
 const ResilienceStroop: React.FC<{ onComplete: (data: any) => void }> = ({ onComplete }) => {
-    const colors = ['RED', 'BLUE', 'GREEN', 'YELLOW'];
-    const colorValues = ['text-red-500', 'text-blue-500', 'text-green-500', 'text-yellow-400'];
+    // Progressive difficulty: colors increase as rounds progress
+    const allColors = ['RED', 'BLUE', 'GREEN', 'YELLOW', 'PURPLE', 'ORANGE', 'PINK'];
+    const allColorValues = ['text-red-500', 'text-blue-500', 'text-green-500', 'text-yellow-400', 'text-purple-500', 'text-orange-500', 'text-pink-500'];
+    
     const [round, setRound] = useState(1);
     const [current, setCurrent] = useState({ text: '', colorIdx: 0 });
     const [score, setScore] = useState(0);
+    const [reactionTimes, setReactionTimes] = useState<number[]>([]);
+    const [accuracyByPhase, setAccuracyByPhase] = useState<Record<string, number[]>>({ warmup: [], plateau: [], fatigue: [] });
+    const [questionStartTime, setQuestionStartTime] = useState<number>(0);
     const TOTAL_ROUNDS = 15;
+    
+    // Determine difficulty phase and colors
+    const getColorCountForRound = (r: number): number => {
+        if (r <= 5) return 4;      // Phase 1: 4 colors (warmup)
+        if (r <= 10) return 5;     // Phase 2: 5 colors (plateau)
+        return 6;                   // Phase 3: 6 colors (fatigue detection)
+    };
+    
+    const getPhaseLabel = (r: number): string => {
+        if (r <= 5) return 'warmup';
+        if (r <= 10) return 'plateau';
+        return 'fatigue';
+    };
+    
     const nextRound = useCallback(() => {
-        if (round > TOTAL_ROUNDS) { onComplete({ stroopScore: score }); return; }
-        const textIdx = Math.floor(Math.random() * 4);
-        const colorIdx = Math.floor(Math.random() * 4);
-        setCurrent({ text: colors[textIdx], colorIdx });
-    }, [round, score, onComplete]);
+        if (round > TOTAL_ROUNDS) { 
+            const avgReaction = reactionTimes.length > 0 ? reactionTimes.reduce((a, b) => a + b, 0) / reactionTimes.length : 0;
+            const rtStdDev = reactionTimes.length > 1
+                ? Math.sqrt(reactionTimes.reduce((sum, rt) => sum + Math.pow(rt - avgReaction, 2), 0) / reactionTimes.length)
+                : 0;
+            
+            // Detect fatigue: compare plateau vs fatigue accuracy
+            const plateauAcc = accuracyByPhase.plateau.length > 0 
+                ? (accuracyByPhase.plateau.reduce((a, b) => a + b, 0) / accuracyByPhase.plateau.length) 
+                : 0;
+            const fatigueAcc = accuracyByPhase.fatigue.length > 0 
+                ? (accuracyByPhase.fatigue.reduce((a, b) => a + b, 0) / accuracyByPhase.fatigue.length) 
+                : 0;
+            const fatigueDetected = plateauAcc - fatigueAcc > 10; // 10% drop = fatigue
+            
+            onComplete({ 
+                stroopScore: score,
+                reactionTimes,
+                avgReactionTime: avgReaction,
+                rtVariability: rtStdDev,
+                fastestReaction: Math.min(...reactionTimes),
+                slowestReaction: Math.max(...reactionTimes),
+                accuracyByPhase,
+                fatigueDetected,
+                composureIndex: 100 - (rtStdDev / avgReaction) // Lower variability = higher composure
+            }); 
+            return; 
+        }
+        
+        const colorCount = getColorCountForRound(round);
+        const textIdx = Math.floor(Math.random() * colorCount);
+        const colorIdx = Math.floor(Math.random() * colorCount);
+        setCurrent({ text: allColors[textIdx], colorIdx });
+        setQuestionStartTime(performance.now());
+    }, [round, score, reactionTimes, accuracyByPhase, onComplete]);
+    
     useEffect(() => { nextRound(); }, [round]);
-    const handleAnswer = (idx: number) => { if (idx === current.colorIdx) setScore(s => s + 1); setRound(r => r + 1); };
+    
+    const handleAnswer = (idx: number) => { 
+        const reactionTime = performance.now() - questionStartTime;
+        const isCorrect = idx === current.colorIdx;
+        const phase = getPhaseLabel(round);
+        
+        if (isCorrect) {
+            setScore(s => s + 1);
+            setReactionTimes(prev => [...prev, reactionTime]);
+        }
+        
+        // Track accuracy by phase
+        setAccuracyByPhase(prev => ({
+            ...prev,
+            [phase]: [...(prev[phase as keyof typeof prev] || []), isCorrect ? 100 : 0]
+        }));
+        
+        setRound(r => r + 1); 
+    };
+    
     return (
         <TerminalShell title="Inhibitory Control // Stroop Protocol">
-            <div className="flex flex-col items-center flex-grow justify-center py-4">
-                <div className={`text-6xl font-black font-orbitron mb-16 tracking-widest ${colorValues[current.colorIdx]}`}>{current.text}</div>
+            <div className="flex flex-col items-center flex-grow justify-center py-4 space-y-4">
+                <div className="text-sm text-gray-500 font-mono">
+                    PHASE {round <= 5 ? 'I' : round <= 10 ? 'II' : 'III'} • COLORS: {getColorCountForRound(round)} • ROUND {round}/{TOTAL_ROUNDS}
+                </div>
+                <div className={`text-6xl font-black font-orbitron mb-16 tracking-widest ${allColorValues[current.colorIdx]}`}>{current.text}</div>
                 <div className="grid grid-cols-2 gap-4 w-full">
-                    {colors.map((c, i) => (<button key={c} onClick={() => handleAnswer(i)} className="bg-black border border-gray-800 p-4 rounded-sm hover:border-white font-black font-orbitron tracking-widest transition-all">{c}</button>))}
+                    {Array.from({ length: getColorCountForRound(round) }).map((_, i: number) => (
+                        <button 
+                            key={allColors[i]} 
+                            onClick={() => handleAnswer(i)} 
+                            className="bg-black border border-gray-800 p-4 rounded-sm hover:border-white font-black font-orbitron tracking-widest transition-all"
+                        >
+                            {allColors[i]}
+                        </button>
+                    ))}
                 </div>
             </div>
         </TerminalShell>
@@ -265,6 +400,100 @@ const ResilienceStroop: React.FC<{ onComplete: (data: any) => void }> = ({ onCom
 };
 
 const DilemmaScreening: React.FC<{ onComplete: (data: any) => void }> = ({ onComplete }) => {
+    // Dilemma substat mapping: each answer code maps to substats it tests
+    const answerSubstatMap: Record<string, Record<string, number>> = {
+        // Dilemma 1: Process vs Impact
+        'PROCESS_FIRST': { Conviction: 80, Willpower: 70, Composure: 60 },
+        'IMPACT_OVER_RULES': { Empathy: 75, Purpose: 80, Conviction: 30 },
+        'DIALOGUE_FIRST': { Charisma: 75, Empathy: 80, Reason: 60 },
+        'SELF_INTEREST': { Resilience: 40, Conviction: 20, Charisma: 50 },
+        'NUANCE_SEEKING': { Reason: 80, Conviction: 75, Empathy: 70 },
+        // Dilemma 2: Opportunity vs Presence
+        'OPPORTUNITY_FIRST': { Resilience: 70, Conviction: 40 },
+        'PRESENCE_MATTERS': { Empathy: 85, Purpose: 85, Faith: 75 },
+        'CREATIVE_SOLUTION': { Reason: 80, Innovation: 75, Purpose: 70 },
+        'CONVINCE_THEM': { Charisma: 70, Conviction: 40 },
+        'ACCEPT_PAIN': { Composure: 80, Empathy: 75, Conviction: 85 },
+        // Dilemma 3: Friendship Dynamics
+        'PURITY_TEST': { Conviction: 85, Willpower: 80 },
+        'STRATEGIC_DISTANCE': { Reason: 75, Resilience: 70 },
+        'HONEST_CONFRONTATION': { Charisma: 70, Conviction: 75 },
+        'TIT_FOR_TAT': { Conviction: 30, Composure: 40 },
+        'MATURE_ACCEPTANCE': { Empathy: 80, Reason: 75, Conviction: 70 },
+        // Dilemma 4: Medical Autonomy
+        'AUTONOMY_ABSOLUTE': { Reason: 80, Conviction: 75 },
+        'WEIGH_STAKES': { Reason: 75, Empathy: 75 },
+        'PROTECT_CHILD': { Purpose: 85, Conviction: 70, Willpower: 75 },
+        'BRIDGE_BUILDING': { Charisma: 75, Reason: 70, Empathy: 70 },
+        'EMBRACE_CONFLICT': { Composure: 80, Conviction: 75, Empathy: 70 },
+        // Dilemma 5: Charity Dilemma
+        'COMPASSION_FIRST': { Empathy: 85, Purpose: 80, Faith: 75 },
+        'SELF_PRESERVATION': { Resilience: 70, Conviction: 40 },
+        'ENABLE_AGENCY': { Empathy: 70, Reason: 75, Purpose: 75 },
+        'PRACTICAL_GENEROSITY': { Empathy: 80, Reason: 75 },
+        'BOUNDED_HELP': { Reason: 80, Composure: 75, Empathy: 70 },
+        // Dilemma 6: Environmental Ethics
+        'TRANSPARENCY_OUTSOURCE': { Conviction: 70, Reason: 80 },
+        'INTERNAL_VOICE': { Purpose: 75, Charisma: 70, Conviction: 70 },
+        'ROLE_ACCEPTANCE': { Conviction: 30, Resilience: 60 },
+        'VOTE_WITH_FEET': { Purpose: 85, Conviction: 80, Willpower: 75 },
+        'STRATEGIC_INSIDER': { Reason: 80, Strategy: 75, Purpose: 75 },
+        // Dilemma 7: Parental Judgment
+        'TRUST_TIMELINE': { Empathy: 85, Purpose: 80, Faith: 75 },
+        'INFORMED_HELP': { Reason: 75, Empathy: 75, Purpose: 75 },
+        'SHARED_BURDEN': { Resilience: 70, Composure: 70 },
+        'PARENTAL_OVERRIDE': { Conviction: 75, Willpower: 80, Purpose: 70 },
+        'MEET_THEM_THERE': { Empathy: 85, Charisma: 70, Purpose: 75 },
+        // Dilemma 8: Speaking Up Under Risk
+        'INTEGRITY_OVER_SAFETY': { Conviction: 90, Purpose: 85, Willpower: 85 },
+        'PROTECT_SELF': { Resilience: 60, Conviction: 30 },
+        'STRATEGIC_SUPPORT': { Reason: 75, Charisma: 70, Purpose: 70 },
+        'INDIRECT_ACTION': { Strategy: 80, Reason: 75, Purpose: 75 },
+        'LONG_GAME': { Reason: 80, Strategy: 80, Purpose: 75 },
+        // Dilemma 9: Hiring Decision
+        'NETWORKS_PRACTICAL': { Conviction: 40, Reason: 50 },
+        'CORRECT_IMBALANCES': { Purpose: 85, Empathy: 80, Conviction: 75 },
+        'MERIT_NEUTRAL': { Reason: 75, Conviction: 60 },
+        'SOLVE_CREATIVELY': { Reason: 80, Innovation: 80, Purpose: 75 },
+        'ACKNOWLEDGE_HARM': { Empathy: 85, Conviction: 75, Composure: 75 },
+        // Dilemma 10: Unethical Data
+        'UTILITARIAN_USE': { Reason: 70, Purpose: 60, Conviction: 40 },
+        'PRINCIPLE_OVER_BENEFIT': { Conviction: 85, Purpose: 80, Willpower: 75 },
+        'REDEMPTIVE_USE': { Reason: 80, Purpose: 80, Conviction: 75 },
+        'CONSENT_SEEKING': { Empathy: 85, Purpose: 85, Reason: 75 },
+        'INTEGRITY_SLOWER': { Conviction: 85, Willpower: 80, Purpose: 80 },
+        // Dilemma 11: Historical Crime
+        'TRUTH_ABSOLUTE': { Conviction: 85, Purpose: 75, Willpower: 80 },
+        'REDEMPTION_PATH': { Empathy: 80, Purpose: 80, Reason: 75 },
+        'LET_PAST_REST': { Composure: 75, Conviction: 45, Resilience: 70 },
+        'GUIDED_HONESTY': { Empathy: 80, Charisma: 75, Purpose: 80 },
+        'NO_CLEAN_ANSWER': { Composure: 80, Conviction: 75, Empathy: 75 },
+        // Dilemma 12: Group Dissent
+        'VOICE_ALWAYS': { Conviction: 75, Charisma: 70, Purpose: 70 },
+        'DEFER_TO_GROUP': { Composure: 70, Conviction: 40, Resilience: 60 },
+        'PRIVATE_DISSENT': { Reason: 70, Strategy: 75 },
+        'GENTLE_CHALLENGE': { Charisma: 75, Reason: 70, Empathy: 70 },
+        'STRATEGIC_ALLIES': { Strategy: 80, Charisma: 75, Reason: 70 },
+        // Dilemma 13: Helping Against Wishes
+        'BREAK_BOUNDARY': { Purpose: 75, Willpower: 75, Conviction: 60 },
+        'HANDS_OFF': { Reason: 75, Conviction: 70, Empathy: 60 },
+        'SEEK_PERMISSION': { Charisma: 75, Empathy: 80, Reason: 70 },
+        'GENTLE_NUDGE': { Charisma: 80, Empathy: 75, Strategy: 70 },
+        'SUPPORT_ONLY': { Empathy: 85, Resilience: 75, Purpose: 75 },
+        // Dilemma 14: Personal Error
+        'INTEGRITY_AUTOMATIC': { Conviction: 90, Willpower: 85, Composure: 75 },
+        'EXPLOIT_ADVANTAGE': { Conviction: 20, Resilience: 50 },
+        'DELAYED_HONESTY': { Conviction: 50, Composure: 60 },
+        'DEEPEN_DECEPTION': { Conviction: 10, Willpower: 30 },
+        'RESENTFUL_HONESTY': { Conviction: 70, Willpower: 75, Composure: 65 },
+        // Dilemma 15: Allocation Under Scarcity
+        'UTILITARIAN_MATH': { Reason: 80, Purpose: 60 },
+        'EQUITY_FOCUS': { Purpose: 85, Empathy: 80, Conviction: 80 },
+        'EQUAL_SHARE': { Fairness: 75, Conviction: 70 },
+        'RELATIONAL_CHOICE': { Resilience: 60, Conviction: 40 },
+        'REJECT_FALSE_DILEMMA': { Reason: 85, Innovation: 75, Purpose: 75 },
+    };
+
     const baseDilemmas = [
         { q: "Your team discovers that a colleague has been quietly funneling company resources to help underprivileged communities they grew up in. It's technically illegal, but the work is genuinely helping people. Do you:", options: [ { text: "Report it immediately—rules exist for reasons.", code: "PROCESS_FIRST" }, { text: "Turn a blind eye; they're doing real good and no one's harmed.", code: "IMPACT_OVER_RULES" }, { text: "Talk to them privately first and help them find legal ways to continue.", code: "DIALOGUE_FIRST" }, { text: "Use this knowledge as leverage for personal gain later.", code: "SELF_INTEREST" }, { text: "Report it but recommend they get commended for their intent.", code: "NUANCE_SEEKING" } ] },
         { q: "You're offered a promotion that would triple your salary, but it requires moving to a city where your aging parent lives alone without family nearby. They'll need to go to a facility.", options: [ { text: "Take the promotion; they'll be better cared for in a professional setting anyway.", code: "OPPORTUNITY_FIRST" }, { text: "Refuse the promotion; your presence matters more than money.", code: "PRESENCE_MATTERS" }, { text: "Negotiate with your employer for remote work or try to delay the move.", code: "CREATIVE_SOLUTION" }, { text: "Encourage your parent to move with you; they'd adapt.", code: "CONVINCE_THEM" }, { text: "Accept but feel guilty regardless—there's no perfect answer here.", code: "ACCEPT_PAIN" } ] },
@@ -285,11 +514,118 @@ const DilemmaScreening: React.FC<{ onComplete: (data: any) => void }> = ({ onCom
     const [idx, setIdx] = useState(0);
     const [answers, setAnswers] = useState<string[]>([]);
     const [shuffledOptions, setShuffledOptions] = useState<any[]>([]);
-    useEffect(() => { if (idx < baseDilemmas.length) setShuffledOptions(shuffleArray(baseDilemmas[idx].options)); }, [idx]);
+    
+    useEffect(() => { 
+        if (idx < baseDilemmas.length) setShuffledOptions(shuffleArray(baseDilemmas[idx].options)); 
+    }, [idx]);
+
+    // Calculate consistency between related dilemmas
+    const calculateConsistency = (newAnswers: string[]) => {
+        // Map dilemmas to value dimensions
+        const valuePatterns: Record<string, string[]> = {
+            'integrity': ['INTEGRITY_OVER_SAFETY', 'INTEGRITY_AUTOMATIC', 'PRINCIPLE_OVER_BENEFIT', 'TRUTH_ABSOLUTE'],
+            'pragmatism': ['STRATEGIC_DISTANCE', 'PRACTICAL_GENEROSITY', 'STRATEGIC_INSIDER', 'STRATEGIC_ALLIES'],
+            'empathy': ['COMPASSION_FIRST', 'EMPATHY_85+', 'PRESENCE_MATTERS', 'MEET_THEM_THERE']
+        };
+        
+        const consistencyScore: Record<string, number> = {};
+        for (const [dimension, codes] of Object.entries(valuePatterns)) {
+            const matches = newAnswers.filter(code => codes.includes(code)).length;
+            consistencyScore[dimension] = (matches / codes.length) * 100;
+        }
+        
+        return consistencyScore;
+    };
+
+    // Calculate confidence intervals for substat scores
+    const calculateConfidenceIntervals = (substatScores: Record<string, number[]>) => {
+        const ci: Record<string, { mean: number; margin: number; low: number; high: number }> = {};
+        
+        for (const [substat, scores] of Object.entries(substatScores)) {
+            const mean = scores.reduce((a, b) => a + b, 0) / scores.length;
+            const variance = scores.reduce((sum, x) => sum + Math.pow(x - mean, 2), 0) / scores.length;
+            const stdDev = Math.sqrt(variance);
+            // 95% CI: ±1.96 * (stdDev / sqrt(n))
+            const margin = scores.length > 1 ? 1.96 * (stdDev / Math.sqrt(scores.length)) : 10;
+            
+            ci[substat] = {
+                mean,
+                margin,
+                low: Math.max(0, mean - margin),
+                high: Math.min(100, mean + margin)
+            };
+        }
+        
+        return ci;
+    };
+
     const handleSelect = (code: string) => {
         const newAnswers = [...answers, code];
-        if (idx >= baseDilemmas.length - 1) onComplete({ spiritDilemmas: newAnswers });
-        else { setAnswers(newAnswers); setIdx(idx + 1); }
+        if (idx >= baseDilemmas.length - 1) {
+            // Score all dilemma answers
+            const substatScores: Record<string, number[]> = {};
+            
+            newAnswers.forEach(answerCode => {
+                const mapping = answerSubstatMap[answerCode] || {};
+                Object.entries(mapping).forEach(([substat, score]) => {
+                    if (!substatScores[substat]) substatScores[substat] = [];
+                    substatScores[substat].push(score);
+                });
+            });
+            
+            // Average scores for each substat
+            const avgScores: Record<string, number> = {};
+            Object.entries(substatScores).forEach(([substat, scores]) => {
+                avgScores[substat] = scores.reduce((a, b) => a + b, 0) / scores.length;
+            });
+            
+            // Calculate consistency & confidence intervals
+            const consistency = calculateConsistency(newAnswers);
+            const confidenceIntervals = calculateConfidenceIntervals(substatScores);
+            
+            // Build value profile based on high-scoring substats
+            const valueProfile: Record<string, string> = {};
+            const sortedScores = Object.entries(avgScores).sort((a, b) => b[1] - a[1]);
+            
+            // Map top substats to value dimensions
+            const valueMapping: Record<string, string> = {
+                'Conviction': 'Integrity-driven',
+                'Purpose': 'Purpose-oriented',
+                'Empathy': 'Compassionate',
+                'Resilience': 'Resilient',
+                'Charisma': 'Charismatic',
+                'Reason': 'Rational/Analytical',
+            };
+            
+            const topValues = sortedScores.slice(0, 3).map(([substat, score]) => `${valueMapping[substat] || substat} (${Math.round(score)}%)`);
+            const primaryProfile = topValues.join(' + ') || 'Balanced';
+            
+            // Detect outliers (low conviction, high empathy, etc. = certain archetypes)
+            const lowConviction = avgScores.Conviction < 40;
+            const highEmpathy = avgScores.Empathy > 70;
+            const highReason = avgScores.Reason > 70;
+            
+            let archetype = 'Balanced Pragmatist';
+            if (highEmpathy && lowConviction) archetype = 'Empathic Relativist';
+            if (highEmpathy && !lowConviction) archetype = 'Compassionate Idealist';
+            if (highReason && lowConviction) archetype = 'Skeptical Analyst';
+            if (highReason && !lowConviction) archetype = 'Principled Strategist';
+            
+            onComplete({ 
+                spiritDilemmas: newAnswers,
+                dilemmaScores: avgScores,
+                dilemmaConsistency: consistency,
+                dilemmaConfidence: confidenceIntervals,
+                valueProfile: {
+                    topValues,
+                    primaryProfile,
+                    archetype
+                }
+            });
+        } else { 
+            setAnswers(newAnswers); 
+            setIdx(idx + 1); 
+        }
     };
     return (
         <TerminalShell title="Moral Architecture // Spirit Calibration">
@@ -330,32 +666,92 @@ const DilemmaScreening: React.FC<{ onComplete: (data: any) => void }> = ({ onCom
 
 // --- ENGINE: SYSTEM EQUILIBRIUM (SYSTEMIC REASONING) ---
 const EquilibriumReasoningTask: React.FC<{ onComplete: (data: any) => void }> = ({ onComplete }) => {
-    // Adaptive reasoning question bank with varying difficulty
+    // Advanced reasoning question bank - IQ-based, multi-domain
     const reasoningQuestions: Record<number, any[]> = {
-        20: [ // Very Easy (20%)
-            { text: "2 + 2 = ?", options: ["3", "4", "5", "6"], correct: 1 },
-            { text: "Which is bigger: 10 or 5?", options: ["5", "10", "Same", "Cannot tell"], correct: 1 },
-            { text: "If I have 3 apples and give away 1, how many do I have left?", options: ["1", "2", "3", "4"], correct: 1 },
+        20: [ // Percentile 80+ (easiest 20%) - EXPANDED
+            { text: "If all mammals have fur and dogs are mammals, do dogs have fur?", options: ["No", "Yes", "Maybe", "Unclear"], correct: 1, domain: "Logic" },
+            { text: "3 + 5 × 2 = ?", options: ["16", "13", "11", "20"], correct: 1, domain: "Math" },
+            { text: "Sunrise is to east as sunset is to...?", options: ["North", "South", "West", "Up"], correct: 2, domain: "Analogy" },
+            { text: "2 + 2 = ?", options: ["3", "4", "5", "6"], correct: 1, domain: "Math" },
+            { text: "Which is bigger: 10 or 5?", options: ["5", "10", "Same", "Cannot tell"], correct: 1, domain: "Logic" },
+            { text: "If I have 3 apples and give away 1, how many do I have left?", options: ["1", "2", "3", "4"], correct: 1, domain: "Logic" },
+            { text: "What color is the sky on a clear day?", options: ["Red", "Blue", "Green", "Yellow"], correct: 1, domain: "Logic" },
+            { text: "Is ice hot or cold?", options: ["Hot", "Cold", "Warm", "Neither"], correct: 1, domain: "Logic" },
+            { text: "5 × 2 = ?", options: ["7", "10", "12", "15"], correct: 1, domain: "Math" },
+            { text: "Teacher is to school as doctor is to...?", options: ["Hospital", "Patient", "Medicine", "Disease"], correct: 0, domain: "Analogy" },
+            { text: "Which doesn't belong: Apple, Banana, Carrot, Orange?", options: ["Apple", "Banana", "Carrot", "Orange"], correct: 2, domain: "Logic" },
+            { text: "1 + 1 + 1 = ?", options: ["2", "3", "4", "5"], correct: 1, domain: "Math" },
+            { text: "What comes next: A, B, C, ?", options: ["D", "E", "F", "G"], correct: 0, domain: "Logic" },
+            { text: "Pen is to writing as brush is to...?", options: ["Drawing", "Painting", "Color", "Canvas"], correct: 0, domain: "Analogy" },
+            { text: "8 - 3 = ?", options: ["4", "5", "6", "7"], correct: 1, domain: "Math" },
         ],
-        35: [ // Easy
-            { text: "If all cats are animals, and Fluffy is a cat, then Fluffy is an...?", options: ["Plant", "Animal", "Rock", "Color"], correct: 1 },
-            { text: "A bat and ball cost $1.10 total. The bat costs $1.00 more than the ball. How much does the ball cost?", options: ["$0.10", "$0.05", "$0.15", "$0.20"], correct: 1 },
-            { text: "If the day after tomorrow is Thursday, what day is today?", options: ["Monday", "Tuesday", "Wednesday", "Friday"], correct: 1 },
+        35: [ // Percentile 65% - EXPANDED
+            { text: "A bag contains red, blue, and green balls in equal quantities. What's the probability of drawing red twice without replacement?", options: ["1/6", "1/9", "1/3", "2/9"], correct: 0, domain: "Probability" },
+            { text: "Which number doesn't belong: 2, 3, 5, 7, 9, 11?", options: ["7", "9", "11", "2"], correct: 1, domain: "Logic" },
+            { text: "If A leads B and C lags B, then...?", options: ["A leads C", "C leads A", "All equal", "Cannot determine"], correct: 0, domain: "Logic" },
+            { text: "If all cats are animals, and Fluffy is a cat, then Fluffy is an...?", options: ["Plant", "Animal", "Rock", "Color"], correct: 1, domain: "Logic" },
+            { text: "A bat and ball cost $1.10. The bat costs $1.00 more than the ball. How much does the ball cost?", options: ["$0.10", "$0.05", "$0.15", "$0.20"], correct: 1, domain: "Math" },
+            { text: "If the day after tomorrow is Thursday, what day is today?", options: ["Monday", "Tuesday", "Wednesday", "Friday"], correct: 2, domain: "Logic" },
+            { text: "John is taller than Mary. Mary is taller than Steve. Who is tallest?", options: ["John", "Mary", "Steve", "Cannot tell"], correct: 0, domain: "Logic" },
+            { text: "What comes next: 2, 4, 6, 8, ?", options: ["9", "10", "11", "12"], correct: 1, domain: "Logic" },
+            { text: "What is 50% of 80?", options: ["30", "40", "50", "60"], correct: 1, domain: "Math" },
+            { text: "If all squares are rectangles, is a rectangle a square?", options: ["Yes", "No", "Always", "Sometimes"], correct: 1, domain: "Logic" },
+            { text: "What is 12 × 5?", options: ["50", "60", "70", "80"], correct: 1, domain: "Math" },
+            { text: "If 2x = 10, what is x?", options: ["3", "5", "7", "10"], correct: 1, domain: "Math" },
+            { text: "Three boxes: one has apples, one has oranges, one has both. All labels are wrong. You pick one apple from 'both' box. What's in oranges box?", options: ["Oranges", "Apples", "Both", "Cannot determine"], correct: 1, domain: "Logic" },
+            { text: "What is 100 - 25?", options: ["70", "75", "80", "85"], correct: 1, domain: "Math" },
+            { text: "If A=1, B=2, what is D?", options: ["3", "4", "5", "6"], correct: 1, domain: "Logic" },
         ],
-        50: [ // Medium
-            { text: "In a room of 23 people, what is the approximate probability that at least two share a birthday?", options: ["About 10%", "About 25%", "About 50%", "About 75%"], correct: 2 },
-            { text: "If all Zorps are Blips, and some Blips are Clonks, what must be true?", options: ["All Zorps are Clonks", "Some Zorps might be Clonks", "No Zorps are Clonks", "Cannot determine"], correct: 1 },
-            { text: "A train leaves at 60 mph. Another leaves 2 hours later at 90 mph. When does it catch up?", options: ["3 hours", "4 hours", "5 hours", "6 hours"], correct: 1 },
+        50: [ // Percentile 50% (median) - EXPANDED
+            { text: "Sophie's parents have three children: April, May, and...?", options: ["June", "Sophie", "Not enough info", "August"], correct: 1, domain: "Lateral" },
+            { text: "What is 27^(2/3)?", options: ["3", "9", "81", "27"], correct: 1, domain: "Math" },
+            { text: "If X is inversely proportional to Y and X=5 when Y=4, what is X when Y=2?", options: ["2.5", "10", "5", "8"], correct: 1, domain: "Math" },
+            { text: "Which is the most logical conclusion? All birds lay eggs. Penguins are birds.", options: ["Penguins lay eggs", "Not all birds lay eggs", "Eggs are round", "Some birds fly"], correct: 0, domain: "Logic" },
+            { text: "In a room of 23 people, what's the approximate probability two share a birthday?", options: ["About 10%", "About 25%", "About 50%", "About 75%"], correct: 2, domain: "Probability" },
+            { text: "If all Zorps are Blips, and some Blips are Clonks, what must be true?", options: ["All Zorps are Clonks", "Some Zorps might be Clonks", "No Zorps are Clonks", "Cannot determine"], correct: 1, domain: "Logic" },
+            { text: "A train leaves at 60 mph. Another leaves 2 hours later at 90 mph. When does it catch up?", options: ["3 hours", "4 hours", "5 hours", "6 hours"], correct: 1, domain: "Math" },
+            { text: "What is the next number: 1, 1, 2, 3, 5, 8, ?", options: ["13", "12", "11", "10"], correct: 0, domain: "Logic" },
+            { text: "If you have a 3-gallon and 5-gallon jug, how do you measure 4 gallons?", options: ["Fill 3, pour into 5, refill 3, pour 1 more", "Impossible", "Fill 5, pour 1 into 3", "Fill both"], correct: 0, domain: "Logic" },
+            { text: "What is √144?", options: ["10", "12", "14", "16"], correct: 1, domain: "Math" },
+            { text: "If p=0.5 and q=0.3 are independent, what's P(p AND q)?", options: ["0.8", "0.65", "0.15", "0.08"], correct: 2, domain: "Probability" },
+            { text: "What is 15% of 200?", options: ["20", "30", "40", "50"], correct: 1, domain: "Math" },
+            { text: "If the pattern is 1, 4, 9, 16, what's next?", options: ["20", "25", "30", "36"], correct: 1, domain: "Logic" },
+            { text: "What is 2^5?", options: ["16", "32", "64", "128"], correct: 1, domain: "Math" },
+            { text: "If A>B and B>C, what can we conclude?", options: ["A>C", "C>A", "A=C", "Cannot determine"], correct: 0, domain: "Logic" },
         ],
-        65: [ // Hard
-            { text: "Three boxes: apples, oranges, both. All labels are WRONG. You draw an apple from the 'both' box. What's in the 'oranges' box?", options: ["Oranges", "Apples", "Both", "Cannot determine"], correct: 1 },
-            { text: "If A=1, B=2, C=3... Z=26, what is LOGIC?", options: ["62", "70", "78", "86"], correct: 1 },
-            { text: "A room has 3 switches outside and 1 light inside. You can flip switches but can only enter once. How do you know which switch controls the light?", options: ["Use heat from bulbs", "Check voltage", "Guess randomly", "Use timer and touch bulb"], correct: 0 },
+        65: [ // Percentile 35% - EXPANDED
+            { text: "A clock is 8 minutes slow and loses 30 seconds per hour. In how many hours will it show the correct time again?", options: ["512 hrs", "480 hrs", "16 hrs", "32 hrs"], correct: 1, domain: "Math" },
+            { text: "In cryptarithmetic SEND+MORE=MONEY, what is M?", options: ["1", "2", "8", "9"], correct: 0, domain: "Logic" },
+            { text: "If the nth term of a sequence is n² + 2n + 1, what is the 10th term?", options: ["121", "130", "100", "144"], correct: 0, domain: "Math" },
+            { text: "A man is in a locked room with only a piano. How does he escape?", options: ["Play middle C", "Use C sharp key", "Pick the lock", "Move the piano"], correct: 1, domain: "Lateral" },
+            { text: "How many squares are in a 4x4 grid (all sizes)?", options: ["16", "30", "40", "64"], correct: 1, domain: "Logic" },
+            { text: "What is the derivative of x^3?", options: ["3x^2", "x^2", "3x", "x^3/3"], correct: 0, domain: "Calculus" },
+            { text: "If 3x + 4 = 16, what is x?", options: ["2", "3", "4", "5"], correct: 2, domain: "Math" },
+            { text: "What is log₁₀(1000)?", options: ["1", "2", "3", "4"], correct: 2, domain: "Math" },
+            { text: "If A implies B and B implies C, does A imply C?", options: ["Yes", "No", "Sometimes", "Cannot determine"], correct: 0, domain: "Logic" },
+            { text: "What is 7!  (factorial)?", options: ["840", "2520", "5040", "7"], correct: 2, domain: "Math" },
+            { text: "Person born 1900, died 1950. How many days?", options: ["18,250", "18,262", "18,263", "18,275"], correct: 2, domain: "Logic" },
+            { text: "What is the Monty Hall problem solution?", options: ["Always stay", "Always switch", "Doesn't matter", "50/50"], correct: 1, domain: "Logic" },
+            { text: "If f(x)=2x² what is f(3)?", options: ["12", "18", "24", "36"], correct: 1, domain: "Math" },
+            { text: "What is sin(90°)?", options: ["0", "1", "-1", "undefined"], correct: 1, domain: "Math" },
+            { text: "In formal logic, what is a tautology?", options: ["A contradiction", "Always true", "Sometimes false", "Unprovable"], correct: 1, domain: "Logic" },
         ],
-        80: [ // Very Hard
-            { text: "If p=.5 and q=.3 and they're independent, what's P(p AND q)?", options: ["0.8", "0.65", "0.15", "0.08"], correct: 2 },
-            { text: "How many squares can you find in a 4x4 grid? (including all sizes)", options: ["16", "30", "40", "64"], correct: 1 },
-            { text: "A person born in 1900 and died in 1950 lived how many days?", options: ["18,250", "18,262", "18,263", "18,275"], correct: 2 },
+        80: [ // Percentile 20% (hardest 20%) - EXPANDED
+            { text: "In a system of equations where 3x + 4y = 20 and 2x - 3y = 1, solve for x.", options: ["4", "3", "2", "5"], correct: 0, domain: "Math" },
+            { text: "What is the 6th term in: 1, 1, 2, 6, 24, ...?", options: ["120", "144", "720", "240"], correct: 2, domain: "Logic" },
+            { text: "Gödel's incompleteness theorem suggests...?", options: ["All truths provable", "Some truths unprovable", "Math contradictory", "Logic circular"], correct: 1, domain: "Meta" },
+            { text: "If f(x) = 2x³ - 5x² + 4x - 1, what is f'(2)?", options: ["8", "12", "20", "15"], correct: 2, domain: "Calculus" },
+            { text: "In modal logic, what does ◇P ∧ ¬◇Q imply?", options: ["P possible, Q necessary", "P possible, Q not necessary", "P necessary, Q possible", "Cannot determine"], correct: 1, domain: "Logic" },
+            { text: "What is the limit of (x²-1)/(x-1) as x→1?", options: ["0", "1", "2", "undefined"], correct: 2, domain: "Calculus" },
+            { text: "If ∑(n=1 to ∞) 1/n² = π²/6, what is this series?", options: ["Basel problem", "Riemann zeta", "Euler product", "All above"], correct: 3, domain: "Math" },
+            { text: "In Peano axioms, what defines natural numbers?", options: ["Set theory", "Successor function", "Infinity axiom", "Both B&C"], correct: 3, domain: "Logic" },
+            { text: "What is the cardinality of the continuum?", options: ["ℵ₀", "ℵ₁", "c", "undefined"], correct: 2, domain: "Math" },
+            { text: "Cantor's diagonal argument proves what?", options: ["Reals countable", "Reals uncountable", "Integers finite", "All equal"], correct: 1, domain: "Logic" },
+            { text: "What is the P vs NP problem status?", options: ["Solved P=NP", "Solved P≠NP", "Unsolved", "Undecidable"], correct: 2, domain: "Logic" },
+            { text: "In ZFC set theory, what is a proper class?", options: ["Finite set", "Too big for ZFC", "Empty set", "Null class"], correct: 1, domain: "Logic" },
+            { text: "What is a Godel number?", options: ["Prime number", "Encoding of formula", "Transcendental", "Random"], correct: 1, domain: "Logic" },
+            { text: "If x² + y² = z², what is this?", options: ["Linear equation", "Circle", "Pythagorean triple", "Fermat equation"], correct: 2, domain: "Math" },
+            { text: "What does Church's thesis state?", options: ["God exists", "Computability equivalence", "Logic complete", "Continuum real"], correct: 1, domain: "Logic" },
         ],
     };
 
@@ -371,7 +767,7 @@ const EquilibriumReasoningTask: React.FC<{ onComplete: (data: any) => void }> = 
 
     const fetchNextQuestion = (currDiff: number, currHist: any[]) => {
         setLoading(true);
-        const usedQuestions = currHist.map(h => h.q);
+        const usedQuestions = currHist.map(h => h.text);
         
         // Find closest difficulty level
         const diffLevels = [20, 35, 50, 65, 80];
@@ -385,7 +781,11 @@ const EquilibriumReasoningTask: React.FC<{ onComplete: (data: any) => void }> = 
             ? availableQuestions[Math.floor(Math.random() * availableQuestions.length)]
             : questionBank[Math.floor(Math.random() * questionBank.length)];
         
-        setCurrentQ(q);
+        // Shuffle answer options to avoid "always B" bias
+        const shuffledOptions = shuffleArray([...q.options]);
+        const newCorrectIdx = shuffledOptions.indexOf(q.options[q.correct]);
+        
+        setCurrentQ({ ...q, options: shuffledOptions, correct: newCorrectIdx });
         setSelectedOption(null);
         setLoading(false);
     };
@@ -413,15 +813,29 @@ const EquilibriumReasoningTask: React.FC<{ onComplete: (data: any) => void }> = 
         
         setTimeout(() => {
             if (round >= TOTAL_ROUNDS) {
-                // Final score based on final difficulty (higher = smarter)
-                const finalScore = difficulty;
-                onComplete({ reasoningScore: finalScore, history: newHistory, finalDifficulty: difficulty });
+                // Final score: the equilibrium difficulty represents user's percentile
+                // difficulty=20 means user answers like 80% of population (easy) = low score
+                // difficulty=80 means user answers like 20% of population (hard) = high score
+                const correctCnt = newHistory.filter(h => h.correct).length;
+                const finalScore = 100 - difficulty;
+                onComplete({ 
+                    reasoningScore: finalScore, 
+                    history: newHistory, 
+                    finalDifficulty: difficulty,
+                    correctAnswers: correctCnt,
+                    totalAttempts: TOTAL_ROUNDS
+                });
             } else {
-                // Adaptive difficulty adjustment
+                // FIXED ADAPTIVE LOGIC:
+                // difficulty = percentile (% who can answer correctly)
+                // Higher difficulty% = easier question (more people know it)
+                // Lower difficulty% = harder question (fewer people know it)
+                // If correct on easy (high%), ask harder (decrease %)
+                // If wrong on hard (low%), ask easier (increase %)
                 const step = Math.max(3, 25 / (round + 0.5));
                 const nextDiff = isCorrect 
-                    ? Math.max(15, difficulty - step)  // Correct = harder questions
-                    : Math.min(85, difficulty + step); // Wrong = easier questions
+                    ? Math.max(15, difficulty - step)  // FIXED: Correct = DECREASE % = harder next
+                    : Math.min(85, difficulty + step); // FIXED: Wrong = INCREASE % = easier next
                 
                 setDifficulty(nextDiff);
                 setRound(r => r + 1);
@@ -512,7 +926,7 @@ const HobbySelection: React.FC<{ onComplete: (data: any) => void }> = ({ onCompl
 // 5-prompt assessment system: Imagination, Innovation, Style, Vision, Expression
 const CreativeProtocolTest: React.FC<{ onComplete: (data: any) => void }> = ({ onComplete }) => {
     const [currentPromptIndex, setCurrentPromptIndex] = useState(0);
-    const [responses, setResponses] = useState<Record<string, string>>({});
+    const [responses, setResponses] = useState<Record<string, any>>({});
     const [phase, setPhase] = useState<'briefing' | 'active' | 'complete'>('briefing');
     const [response, setResponse] = useState('');
     const [timeLeft, setTimeLeft] = useState(90);
@@ -546,7 +960,7 @@ const CreativeProtocolTest: React.FC<{ onComplete: (data: any) => void }> = ({ o
         return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
     }, [phase]);
 
-    // Timer management & focus growth
+    // Timer management - no artificial focus growth
     useEffect(() => {
         if (phase === 'active' && timeLeft > 0) {
             timerRef.current = window.setInterval(() => {
@@ -554,13 +968,6 @@ const CreativeProtocolTest: React.FC<{ onComplete: (data: any) => void }> = ({ o
                     if (t <= 1) {
                         handlePromptComplete();
                         return 0;
-                    }
-                    // Continuous growth check: reward for sustained typing
-                    const timeSinceLastInput = Date.now() - lastInputRef.current;
-                    if (timeSinceLastInput < 8000 && response.length > 0) {
-                        // User has typed within last 8 seconds - tree is growing!
-                        setFocusGrowth(prev => Math.min(100, prev + 0.5));
-                        setTotalFocusScore(prev => prev + 0.5);
                     }
                     return t - 1;
                 });
@@ -579,10 +986,12 @@ const CreativeProtocolTest: React.FC<{ onComplete: (data: any) => void }> = ({ o
     const handleTextChange = (text: string) => {
         setResponse(text);
         lastInputRef.current = Date.now();
-        // Bonus growth for rapid typing
-        if (text.length > 0) {
-            setFocusGrowth(prev => Math.min(100, prev + 0.8));
-            setTotalFocusScore(prev => prev + 0.8);
+        // Track focus: only reward meaningful content milestones
+        // +5 per 50 words (instead of per keystroke)
+        const prevWordCount = getWordCount(responses[currentPrompt.id]?.text || '');
+        const newWordCount = getWordCount(text);
+        if (newWordCount > prevWordCount && newWordCount % 50 === 0) {
+            setFocusGrowth(prev => Math.min(100, prev + 5));
         }
     };
 
@@ -603,28 +1012,43 @@ const CreativeProtocolTest: React.FC<{ onComplete: (data: any) => void }> = ({ o
     const handlePromptComplete = () => {
         if (timerRef.current) clearInterval(timerRef.current);
         
-        // Calculate focus bonus for this prompt
-        const focusBonus = focusStreak ? 1.2 : 1.0; // 20% bonus if no interruptions
+        // Save response WITHOUT mechanical scoring (will be scored by LLM)
         const wordCount = getWordCount(response);
-        const depthScore = Math.min(wordCount / 50, 1) * 20; // Up to 20 points for depth
-        const promptScore = depthScore * focusBonus;
+        const timeUsed = 90 - timeLeft;
         
-        // Save response for this prompt
-        const newResponses = { ...responses, [currentPrompt.id]: response.trim() };
+        const newResponses = { 
+            ...responses, 
+            [currentPrompt.id]: {
+                text: response.trim(),
+                wordCount,
+                timeUsed,
+                hasInterruptions: !focusStreak,
+                promptDefinition: currentPrompt.definition
+            }
+        };
         setResponses(newResponses);
         
         if (isLastPrompt) {
-            // All prompts complete - show harvest screen
+            // All prompts complete - prepare for LLM analysis
             setPhase('complete');
             setTimeout(() => {
-                const finalScore = Math.round(totalFocusScore * 1.5); // Scale to reasonable range
+                // Initialize with baseline scores (will be overwritten by LLM)
+                const creativitySubscores: Record<string, number> = {
+                    'Imagination': 50,
+                    'Innovation': 50,
+                    'Style': 50,
+                    'Expression': 50,
+                    'Vision': 50
+                };
+                
                 onComplete({ 
                     creativityResponse: newResponses,
+                    creativityScores: creativitySubscores, // Placeholder - LLM will score
                     focusMetrics: {
-                        totalFocusScore: finalScore,
                         interruptions: focusInterruptions,
-                        focusStreakBonus: focusStreak ? true : false
-                    }
+                        focusStreakBonus: focusStreak
+                    },
+                    needsLLMAnalysis: true // Flag to trigger LLM scoring
                 });
             }, 2000);
         } else {
@@ -676,30 +1100,30 @@ const CreativeProtocolTest: React.FC<{ onComplete: (data: any) => void }> = ({ o
     // Briefing screen
     if (phase === 'briefing') return (
         <TerminalShell title="Neural Divergence // Creativity Matrix" accentClass="border-amber-600/50">
-            <div className="flex flex-col items-center justify-center text-center flex-grow py-8 space-y-6">
-                <Wand2 className="w-16 h-16 text-amber-500 animate-pulse" />
-                <h2 className="text-2xl font-black font-orbitron text-amber-400 uppercase tracking-[0.2em]">CREATIVITY CALIBRATION</h2>
+            <div className="flex flex-col items-center justify-center text-center flex-grow py-4 sm:py-8 space-y-4 sm:space-y-6 overflow-y-auto max-h-full">
+                <Wand2 className="w-12 sm:w-16 h-12 sm:h-16 text-amber-500 animate-pulse flex-shrink-0" />
+                <h2 className="text-lg sm:text-2xl font-black font-orbitron text-amber-400 uppercase tracking-[0.2em] flex-shrink-0">CREATIVITY CALIBRATION</h2>
                 
-                <div className="text-sm font-mono text-amber-400 font-bold">
+                <div className="text-xs sm:text-sm font-mono text-amber-400 font-bold flex-shrink-0">
                     PROMPT {currentPromptIndex + 1} / {totalPrompts}
                 </div>
                 
-                <div className="bg-gray-900/40 p-6 border border-amber-900/30 rounded-sm max-w-2xl text-left space-y-4">
+                <div className="bg-gray-900/40 p-3 sm:p-6 border border-amber-900/30 rounded-sm max-w-2xl text-left space-y-3 sm:space-y-4 flex-shrink-0">
                     <div className="space-y-2">
-                        <h3 className="text-amber-400 font-bold font-orbitron uppercase tracking-widest text-base">
+                        <h3 className="text-amber-400 font-bold font-orbitron uppercase tracking-widest text-sm sm:text-base">
                             {currentPrompt.substat}
                         </h3>
-                        <p className="text-gray-300 italic text-sm">{currentPrompt.definition}</p>
+                        <p className="text-gray-300 italic text-xs sm:text-sm">{currentPrompt.definition}</p>
                     </div>
                     
-                    <div className="bg-black/40 border border-gray-700 p-4 rounded">
-                        <p className="text-white font-serif text-base leading-relaxed">
-                            {currentPrompt.prompt}
+                    <div className="bg-black/40 border border-gray-700 p-3 sm:p-4 rounded">
+                        <p className="text-white font-serif text-sm sm:text-base leading-relaxed">
+                            "{currentPrompt.prompt}"
                         </p>
                     </div>
                     
                     <div className="pt-2 border-t border-gray-800">
-                        <p className="text-[9px] text-gray-500 italic">
+                        <p className="text-[8px] sm:text-[9px] text-gray-500 italic">
                             You have 90 seconds per prompt. Be honest and thoughtful.
                         </p>
                     </div>
@@ -707,7 +1131,7 @@ const CreativeProtocolTest: React.FC<{ onComplete: (data: any) => void }> = ({ o
                 
                 <button 
                     onClick={handleStart} 
-                    className="w-full max-w-xs bg-amber-600 hover:bg-amber-500 text-black font-black font-orbitron py-5 rounded-sm tracking-[0.3em] uppercase text-sm transition-all"
+                    className="w-full max-w-xs bg-amber-600 hover:bg-amber-500 text-black font-black font-orbitron py-4 sm:py-5 px-4 rounded-sm tracking-[0.3em] uppercase text-xs sm:text-sm transition-all flex-shrink-0 mb-4"
                 >
                     BEGIN
                 </button>
@@ -826,10 +1250,19 @@ const AdaptiveKnowledgeTest: React.FC<{ onComplete: (data: any) => void }> = ({ 
     const fetchNext = (currDiff: number, currHist: any[]) => {
         setLoading(true);
         const usedQuestions = currHist.map(h => h.q);
-        // targetDifficulty matches the population percentage directly now
-        const targetDifficulty = currDiff;
         
-        const q = getAdaptiveQuestionV2(targetDifficulty, usedQuestions);
+        // FIXED: Actually randomize difficulty search to prevent same questions
+        const targetDifficulty = currDiff + (Math.random() * 20 - 10); // Add randomness ±10%
+        
+        // Try multiple times to get a different question
+        let q = null;
+        for (let attempt = 0; attempt < 5; attempt++) {
+            const attemptDiff = Math.max(10, Math.min(90, targetDifficulty + (Math.random() * 30 - 15)));
+            q = getAdaptiveQuestionV2(attemptDiff, usedQuestions);
+            if (q && !usedQuestions.includes(q.questionText)) {
+                break;
+            }
+        }
         
         if (q) {
             setCurrentQ(q);
@@ -837,12 +1270,12 @@ const AdaptiveKnowledgeTest: React.FC<{ onComplete: (data: any) => void }> = ({ 
         } else {
             // Fallback question
             setCurrentQ({
-                questionText: "What planet do we live on?",
-                acceptedAnswers: ["Earth"],
-                domain: "Science",
-                difficulty: 99
+                questionText: "What is the capital of France?",
+                acceptedAnswers: ["Paris"],
+                domain: "Geography",
+                difficulty: 85
             });
-            setCorrectAnswer("Earth");
+            setCorrectAnswer("Paris");
         }
         setLoading(false);
         setUserAnswer('');
@@ -879,13 +1312,16 @@ const AdaptiveKnowledgeTest: React.FC<{ onComplete: (data: any) => void }> = ({ 
         // Start with bigger steps, get smaller as we narrow in
         const step = Math.max(5, 35 / (round + 0.5));
         const nextDiff = isCorrect 
-            ? Math.max(5, difficulty - step)  // Correct = harder questions (lower % would know)
-            : Math.min(95, difficulty + step); // Wrong = easier questions (higher % would know)
+            ? Math.max(5, difficulty - step)  // Correct = DECREASE % = harder next
+            : Math.min(95, difficulty + step); // Wrong = INCREASE % = easier next
         
         setTimeout(() => {
             if (round >= TOTAL_ROUNDS) {
-                // Final score is inverse of difficulty (higher difficulty = lower % = smarter)
-                const finalScore = 100 - difficulty;
+                // Final score: difficulty represents percentile of population answering correctly
+                // User settles at difficulty=50 means 50% of people answer correctly = score 50
+                // User settles at difficulty=80 means 80% of people answer correctly = easier = score 20
+                // User settles at difficulty=20 means 20% of people answer correctly = harder = score 80
+                const finalScore = 100 - difficulty; // Invert: lower difficulty = harder = higher score
                 onComplete({ adaptiveKnowledgeScore: finalScore, history: newHistory, finalDifficulty: difficulty });
             } else {
                 setDifficulty(nextDiff);
@@ -977,216 +1413,444 @@ const AdaptiveKnowledgeTest: React.FC<{ onComplete: (data: any) => void }> = ({ 
     );
 };
 
-const ChessStrategyTest: React.FC<{ onComplete: (data: any) => void }> = ({ onComplete }) => {
-    // Chess puzzle positions with strategic concepts
-    const puzzles = [
+// ============================================
+// 3-PART MINI-MODULE: STRATEGY ASSESSMENT
+// Part 1: Warm-Up (River Crossing)
+// Part 2: Core (Chess Tactics)
+// Part 3: Closer (Resource/Decision Scenario)
+// ============================================
+
+const StrategyAssessment3Part: React.FC<{ onComplete: (data: any) => void }> = ({ onComplete }) => {
+    // ========== PART 1: LOGIC PUZZLE (QUICK WARM-UP) ==========
+    const quickLogicPuzzle = {
+        title: "LOGIC PUZZLE",
+        prompt: "Three guards stand before three doors. One leads to exit, two lead to traps. Guard A always lies, Guard B always tells truth, Guard C does both randomly. You can ask ONE question to ONE guard. What do you ask to guarantee exit?",
+        hint: "Ask about what ANOTHER guard would say.",
+        answer: "Ask any guard: 'If I asked the truth-teller which door is safe, what would they say?' Then pick the OPPOSITE door.",
+        maxScore: 25,
+        scoringGuide: {
+            optimal: { range: [20, 25], desc: "Correct logic (opposite/strategy)" },
+            partial: { range: [10, 19], desc: "Right thinking, incomplete logic" },
+            wrong: { range: [0, 9], desc: "Wrong/no clear strategy" }
+        }
+    };
+
+    // ========== PART 2: QUICK CHESS PUZZLE (SINGLE PUZZLE) ==========
+    const chessPuzzles = [
         {
             id: 1,
-            title: "TACTICAL PURSUIT",
-            fen: "r1bqkb1r/pppp1ppp/2n2n2/1B2p3/4P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 0 1",
-            difficulty: 30,
-            bestMove: "Nxe5",
-            explanation: "Knight captures with tempo, forking queen. Win material through tactical alertness.",
-            strategicConcept: "Recognize when opponent pieces are overloaded with defense."
-        },
-        {
-            id: 2,
-            title: "POSITIONAL SACRIFICE",
-            fen: "r1bqk2r/pp2nppp/2np1n2/3p4/2BPP3/2N1BP2/PPP3PP/R2QK2R w KQkq - 0 1",
-            difficulty: 50,
-            bestMove: "Bxf7+",
-            explanation: "Sacrifice bishop to rupture kingside defenses. Converts material for decisive attack.",
-            strategicConcept: "Trade material for positional advantage when the initiative justifies it."
-        },
-        {
-            id: 3,
-            title: "PROPHYLACTIC DEFENSE",
-            fen: "r2qkbnr/ppp2ppp/2np4/3Pp3/2B1P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 0 1",
-            difficulty: 40,
-            bestMove: "Nc3",
-            explanation: "Solidify center, prevent black's counterplay. Play with long-term vision.",
-            strategicConcept: "Foresight: block opponent's plans before they develop."
-        },
-        {
-            id: 4,
-            title: "ENDGAME PRECISION",
-            fen: "8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1",
-            difficulty: 35,
-            bestMove: "c4",
-            explanation: "Advance passed pawn methodically. Convert advantage without overextension.",
-            strategicConcept: "Efficiency: advance slowly but surely when winning is certain."
-        },
-        {
-            id: 5,
-            title: "DYNAMIC BALANCE",
-            fen: "r1bqkb1r/pppp1ppp/2n2n2/4p3/4P3/3P1N2/PPP1BPPP/RNBQK2R w KQkq - 0 1",
-            difficulty: 45,
-            bestMove: "dxe5",
-            explanation: "Capture center while maintaining balance. Control key squares.",
-            strategicConcept: "Balance: take calculated risks when position supports aggression."
+            title: "FORCED WIN",
+            description: "White to move. Deliver checkmate or win material in 2 moves.",
+            hint: "Look for a forcing check that limits Black's options.",
+            bestMove: "Qh7",
+            explanation: "Queen check forces the king to move, leading to decisive advantage or mate.",
+            strategicConcept: "Forcing moves (checks, captures, threats) are the foundation of tactical play."
         }
     ];
 
-    const [phase, setPhase] = useState<'briefing' | 'puzzle' | 'reflection' | 'complete'>('briefing');
-    const [puzzleIndex, setPuzzleIndex] = useState(0);
-    const [userMove, setUserMove] = useState('');
-    const [feedback, setFeedback] = useState<string | null>(null);
-    const [isCorrect, setIsCorrect] = useState<boolean | null>(null);
-    const [totalScore, setTotalScore] = useState(0);
-    const [history, setHistory] = useState<any[]>([]);
-    const [reflectionText, setReflectionText] = useState('');
-    const [showReflection, setShowReflection] = useState(false);
-
-    const currentPuzzle = puzzles[puzzleIndex];
-    const progress = ((puzzleIndex + 1) / puzzles.length) * 100;
-
-    const handleStart = () => setPhase('puzzle');
-
-    const validateMove = () => {
-        const normalized = userMove.toUpperCase().replace(/[\s-]/g, '');
-        const expectedMove = currentPuzzle.bestMove.toUpperCase().replace(/[\s-]/g, '');
-        const isValid = normalized.includes(expectedMove) || expectedMove.includes(normalized);
-
-        setIsCorrect(isValid);
-        if (isValid) {
-            const score = 100 - (currentPuzzle.difficulty / 100) * 30;
-            setTotalScore(prev => prev + score);
-            setFeedback(`✓ Correct! ${currentPuzzle.explanation}`);
-        } else {
-            setFeedback(`✗ Not quite. The best move is ${currentPuzzle.bestMove}. ${currentPuzzle.explanation}`);
-        }
-        setShowReflection(true);
+    // ========== PART 3: RESOURCE PRIORITIZATION (CLOSER) ==========
+    const resourceScenario = {
+        title: "PROJECT PRIORITIZATION",
+        prompt: "In a project with limited time/budget/team, prioritize these 4 tasks and justify with risk awareness:",
+        tasks: [
+            { id: "A", name: "Fix critical bug", desc: "Blocks 50% of users" },
+            { id: "B", name: "Add new feature", desc: "Revenue potential +20%" },
+            { id: "C", name: "Market research", desc: "Validates product-market fit" },
+            { id: "D", name: "Competitor analysis", desc: "Informs strategy" }
+        ],
+        maxScore: 20,
+        scoringGuide: "Logical prioritization (critical bug first) + trade-off awareness + backup plan depth"
     };
 
-    const handleReflectionSubmit = () => {
-        const newHistory = [...history, {
-            puzzleId: currentPuzzle.id,
-            title: currentPuzzle.title,
-            userMove,
-            correct: isCorrect,
-            reflection: reflectionText.trim(),
-            concept: currentPuzzle.strategicConcept
+    // ========== STATE MANAGEMENT ==========
+    const [phase, setPhase] = useState<'intro' | 'part1_input' | 'part1_feedback' | 'part2_briefing' | 'part2_puzzle' | 'part2_reflection' | 'part3_input' | 'part3_feedback' | 'complete'>('intro');
+    
+    // Part 1 state
+    const [riverInput, setRiverInput] = useState('');
+    const [riverFeedback, setRiverFeedback] = useState<{ score: number; level: string; message: string } | null>(null);
+    const [riverScore, setRiverScore] = useState(0);
+    
+    // Part 2 state
+    const [chessPuzzleIndex, setChessPuzzleIndex] = useState(0);
+    const [chessMove, setChessMove] = useState('');
+    const [chessFeedback, setChessFeedback] = useState<string | null>(null);
+    const [chessIsCorrect, setChessIsCorrect] = useState<boolean | null>(null);
+    const [chessScore, setChessScore] = useState(0);
+    const [chessShowReflection, setChessShowReflection] = useState(false);
+    const [chessReflection, setChessReflection] = useState('');
+    const [chessHistory, setChessHistory] = useState<any[]>([]);
+    
+    // Part 3 state
+    const [resourceRanking, setResourceRanking] = useState<string[]>([]);
+    const [resourceJustification, setResourceJustification] = useState('');
+    const [resourceContingency, setResourceContingency] = useState('');
+    const [resourceScore, setResourceScore] = useState(0);
+    const [resourceFeedback, setResourceFeedback] = useState<string | null>(null);
+
+    const currentChessPuzzle = chessPuzzles[chessPuzzleIndex];
+    const chessProgress = ((chessPuzzleIndex + 1) / chessPuzzles.length) * 100;
+
+    // ========== PART 1: LOGIC PUZZLE VALIDATION ==========
+    const validateLogicPuzzle = () => {
+        const input = riverInput.toLowerCase();
+        
+        let score = 0;
+        let level = '';
+        let message = '';
+        
+        // Quick validation: look for key concepts
+        const hasOpposite = input.includes('opposite') || input.includes('other') || input.includes('opposite door');
+        const hasStrategy = input.includes('ask') || input.includes('truth') || input.includes('strategy');
+        const hasLogic = input.length >= 30;
+        
+        if (!hasLogic) {
+            score = 5;
+            level = 'INCOMPLETE';
+            message = '✗ Response too brief. Think: how do you use logic to guarantee safety?';
+        } else if (hasOpposite && hasStrategy) {
+            score = 24;
+            level = 'OPTIMAL';
+            message = '✓ Excellent! You found the logic trick: ask any guard about the opposite answer. Strategic thinking at work!';
+        } else if (hasStrategy && hasLogic) {
+            score = 16;
+            level = 'GOOD';
+            message = '✓ Good strategy! You got the right idea about using logic. The key: ask about the opposite door.';
+        } else if (hasLogic) {
+            score = 10;
+            level = 'PARTIAL';
+            message = '✓ Partial success. You showed logical thinking, but the optimal strategy is to ask about the opposite door/guard.';
+        } else {
+            score = 5;
+            level = 'STUCK';
+            message = '✗ No clear strategy. Key insight: Ask any guard "What would the truth-teller say?" Then pick OPPOSITE.';
+        }
+        
+        setRiverScore(score);
+        setRiverFeedback({ score, level, message });
+        setPhase('part1_feedback');
+    };
+
+    const continueToPart2 = () => {
+        setPhase('part2_briefing');
+    };
+
+    // ========== PART 2: CHESS VALIDATION ==========
+    const validateChessMove = () => {
+        const moveRegex = /^([KQRBN])?([a-h])?([1-8])?(x)?([a-h][1-8])(=[QRBN])?(\+|#)?$/i;
+        const userMoveClean = chessMove.trim().toUpperCase();
+        
+        const isValidNotation = moveRegex.test(userMoveClean) || userMoveClean === 'O-O' || userMoveClean === 'O-O-O';
+        
+        if (!isValidNotation) {
+            setChessIsCorrect(false);
+            setChessFeedback(`✗ Invalid notation. Use algebraic (e.g., Nxe5, e4, O-O). The best move is ${currentChessPuzzle.bestMove}.`);
+            setChessShowReflection(true);
+            return;
+        }
+        
+        const correctAnswer = userMoveClean === currentChessPuzzle.bestMove.toUpperCase() ||
+            userMoveClean.replace(/x/i, 'X') === currentChessPuzzle.bestMove.toUpperCase().replace(/x/i, 'X');
+        
+        setChessIsCorrect(correctAnswer);
+        if (correctAnswer) {
+            const pointsPerPuzzle = 25;
+            setChessScore(prev => prev + pointsPerPuzzle);
+            setChessFeedback(`✓ Correct! ${currentChessPuzzle.explanation}`);
+        } else {
+            setChessFeedback(`✗ Not quite. The best move is ${currentChessPuzzle.bestMove}. ${currentChessPuzzle.explanation}`);
+        }
+        setChessShowReflection(true);
+    };
+
+    const handleChessReflectionSubmit = () => {
+        const newHistory = [...chessHistory, {
+            puzzleId: currentChessPuzzle.id,
+            title: currentChessPuzzle.title,
+            userMove: chessMove,
+            correct: chessIsCorrect,
+            reflection: chessReflection.trim(),
+            concept: currentChessPuzzle.strategicConcept
         }];
-        setHistory(newHistory);
+        setChessHistory(newHistory);
 
-        if (puzzleIndex >= puzzles.length - 1) {
-            setPhase('complete');
-            setTimeout(() => {
-                onComplete({
-                    strategyScore: Math.round((totalScore / (puzzles.length * 100)) * 100),
-                    puzzleHistory: newHistory,
-                    totalScore: Math.round(totalScore)
-                });
-            }, 1500);
+        if (chessPuzzleIndex >= chessPuzzles.length - 1) {
+            // Move to Part 3
+            setPhase('part3_input');
         } else {
-            setPuzzleIndex(prev => prev + 1);
-            setUserMove('');
-            setFeedback(null);
-            setIsCorrect(null);
-            setReflectionText('');
-            setShowReflection(false);
-            setPhase('puzzle');
+            setChessPuzzleIndex(prev => prev + 1);
+            setChessMove('');
+            setChessFeedback(null);
+            setChessIsCorrect(null);
+            setChessReflection('');
+            setChessShowReflection(false);
+            setPhase('part2_puzzle');
         }
     };
 
-    if (phase === 'briefing') return (
-        <TerminalShell title="Tactical Engine // Strategy Matrix" accentClass="border-green-900/50">
+    // ========== PART 3: RESOURCE PRIORITIZATION VALIDATION ==========
+    const validateResourcePrioritization = () => {
+        if (resourceRanking.length !== 4) {
+            setResourceFeedback('✗ Please rank all 4 items.');
+            return;
+        }
+        if (!resourceJustification.trim() || resourceJustification.trim().length < 30) {
+            setResourceFeedback('✗ Please provide a justification (min 30 characters).');
+            return;
+        }
+        if (!resourceContingency.trim() || resourceContingency.trim().length < 20) {
+            setResourceFeedback('✗ Please describe a contingency plan.');
+            return;
+        }
+
+        // Score: A (Critical bug) should be first, then logic
+        let score = 0;
+        const isAFirst = resourceRanking[0] === 'A';
+        const hasRiskAwareness = resourceJustification.toLowerCase().includes('risk') ||
+            resourceJustification.toLowerCase().includes('impact') ||
+            resourceJustification.toLowerCase().includes('critical');
+        const hasBackupLogic = resourceContingency.toLowerCase().includes('if') ||
+            resourceContingency.toLowerCase().includes('then') ||
+            resourceContingency.toLowerCase().includes('fail');
+
+        if (isAFirst && hasRiskAwareness && hasBackupLogic) {
+            score = 20;
+            setResourceFeedback('✓ Excellent strategic thinking! You prioritized impact (critical bug), showed trade-off awareness, and articulated contingencies.');
+        } else if (isAFirst && hasRiskAwareness) {
+            score = 15;
+            setResourceFeedback('✓ Good logic. You prioritized correctly and identified risks, but contingency could be deeper.');
+        } else if (isAFirst) {
+            score = 10;
+            setResourceFeedback('✓ Correct priority, but justification lacks risk framing. Next time, explain *why* this order mitigates threats.');
+        } else {
+            score = 5;
+            setResourceFeedback('✗ Reconsider: critical bugs block users. That usually comes first. Strategic foresight means addressing threats before opportunities.');
+        }
+
+        setResourceScore(score);
+        setPhase('part3_feedback');
+    };
+
+    const completeAssessment = () => {
+        // Calculate final scores and averages
+        const totalScore = riverScore + chessScore + resourceScore;
+        const averageStrategyScore = Math.round(totalScore / 3);
+        
+        // Map to substat ranges
+        const strategySubstat = Math.min(95, Math.round((riverScore + chessScore) / 2));
+        const reasonSubstat = Math.min(95, Math.round((chessScore + resourceScore) / 1.5));
+        const perceptionSubstat = Math.min(95, chessScore * 2.5);
+        const convictionSubstat = Math.min(95, Math.round((resourceScore + riverScore) / 1.5));
+        const resilienceSubstat = Math.min(95, 50 + (riverScore + resourceScore));
+
+        onComplete({
+            strategyScore: averageStrategyScore,
+            totalScore,
+            partScores: {
+                warmup: riverScore,
+                core: chessScore,
+                closer: resourceScore
+            },
+            substatContributions: {
+                Strategy: strategySubstat,
+                Reason: reasonSubstat,
+                Perception: perceptionSubstat,
+                Conviction: convictionSubstat,
+                Resilience: resilienceSubstat
+            },
+            chessHistory,
+            riverSolution: riverInput,
+            resourceRanking,
+            resourceJustification,
+            resourceContingency
+        });
+    };
+
+    // ========== PART 1: WARM-UP (RIVER CROSSING) ==========
+    if (phase === 'intro') return (
+        <TerminalShell title="Strategic Engine // 3-Part Calibration" accentClass="border-cyan-900/50">
             <div className="flex flex-col items-center justify-center text-center flex-grow py-12 space-y-8">
-                <div className="text-5xl">♔</div>
-                <h2 className="text-2xl font-black font-orbitron text-green-400 uppercase tracking-[0.2em]">CHESS STRATEGY CALIBRATION</h2>
-                <div className="bg-gray-900/40 p-6 border border-green-900/30 rounded-sm max-w-2xl text-left space-y-4">
-                    <p className="text-gray-300 text-sm"><span className="text-green-400 font-bold">Protocol:</span> 5 tactical puzzles testing calculation depth, positional understanding, and strategic vision.</p>
-                    <p className="text-gray-400 text-xs italic">For each puzzle: identify the best move, then reflect on the strategic principle it demonstrates.</p>
-                    <ul className="text-gray-500 text-xs space-y-1 pl-4 list-disc">
-                        <li><span className="text-green-400">Foresight:</span> How many moves ahead can you calculate?</li>
-                        <li><span className="text-green-400">Efficiency:</span> Do you find optimal moves or settle for adequate?</li>
-                        <li><span className="text-green-400">Balance:</span> Can you weigh risk vs. safety, material vs. position?</li>
-                    </ul>
-                </div>
-                <button onClick={handleStart} className="btn-primary w-full max-w-xs font-orbitron tracking-[0.3em] py-5 uppercase text-sm bg-green-600 hover:bg-green-500">BEGIN CALIBRATION</button>
-            </div>
-        </TerminalShell>
-    );
-
-    if (phase === 'complete') return (
-        <TerminalShell title="Tactical Engine // Complete" accentClass="border-green-900/50">
-            <div className="flex flex-col items-center justify-center flex-grow py-12 space-y-4">
-                <Check className="w-16 h-16 text-green-500" />
-                <h2 className="text-xl font-black font-orbitron text-green-400 uppercase tracking-widest">STRATEGY ASSESSMENT COMPLETE</h2>
-                <p className="text-gray-500 font-mono text-xs">Analyzing your tactical depth and strategic philosophy...</p>
-            </div>
-        </TerminalShell>
-    );
-
-    return (
-        <TerminalShell title={`Tactical Engine // Puzzle ${puzzleIndex + 1}/${puzzles.length}`} accentClass="border-green-900/50">
-            <div className="flex flex-col h-full gap-4">
-                {/* Progress */}
-                <div className="w-full bg-gray-900 h-1 rounded-full relative">
-                    <div className="bg-green-500 h-full rounded-full transition-all duration-300 shadow-[0_0_10px_#22c55e]" style={{ width: `${progress}%` }} />
-                </div>
-
-                {/* Puzzle Title & Strategy Concept */}
-                <div className="bg-green-500/10 border border-green-500/30 rounded-sm p-4">
-                    <h3 className="text-green-400 font-orbitron uppercase tracking-widest text-sm font-bold mb-2">{currentPuzzle.title}</h3>
-                    <p className="text-gray-400 text-xs italic">Strategic Concept: {currentPuzzle.strategicConcept}</p>
-                </div>
-
-                {/* Chess Board Placeholder */}
-                <div className="bg-black border border-gray-700 p-4 rounded-sm flex items-center justify-center min-h-[200px]">
-                    <div className="text-center">
-                        <div className="text-gray-500 text-xs font-mono mb-2">FEN: {currentPuzzle.fen}</div>
-                        <div className="text-gray-600 text-sm italic">Chess position analysis required</div>
-                        <div className="text-gray-700 text-xs mt-2">(Puzzle difficulty: {currentPuzzle.difficulty}/100)</div>
+                <div className="text-5xl">🧭</div>
+                <h2 className="text-2xl font-black font-orbitron text-cyan-400 uppercase tracking-[0.2em]">STRATEGY MATRIX QUICK</h2>
+                <div className="bg-gray-900/40 p-6 border border-cyan-900/30 rounded-sm max-w-2xl text-left space-y-4">
+                    <p className="text-gray-300 text-sm"><span className="text-cyan-400 font-bold">Protocol:</span> Quick 3-part assessment of strategic thinking (10 min max).</p>
+                    <div className="grid grid-cols-3 gap-4 mt-4 text-xs">
+                        <div className="bg-cyan-900/20 p-3 border border-cyan-700/30 rounded">
+                            <span className="text-cyan-400 font-bold">Part 1</span><br/>Logic<br/>(2–3 min)
+                        </div>
+                        <div className="bg-cyan-900/20 p-3 border border-cyan-700/30 rounded">
+                            <span className="text-cyan-400 font-bold">Part 2</span><br/>Chess<br/>(3–4 min)
+                        </div>
+                        <div className="bg-cyan-900/20 p-3 border border-cyan-700/30 rounded">
+                            <span className="text-cyan-400 font-bold">Part 3</span><br/>Decision<br/>(2–3 min)
+                        </div>
                     </div>
                 </div>
+                <button onClick={() => setPhase('part1_input')} className="btn-primary w-full max-w-xs font-orbitron tracking-[0.3em] py-5 uppercase text-sm bg-cyan-600 hover:bg-cyan-500">BEGIN ASSESSMENT</button>
+            </div>
+        </TerminalShell>
+    );
 
-                {/* Move Input */}
-                {!showReflection ? (
+    if (phase === 'part1_input') return (
+        <TerminalShell title="Strategic Engine // Part 1: Logic Puzzle" accentClass="border-yellow-900/50">
+            <div className="flex flex-col h-full gap-4">
+                <div className="w-full bg-gray-900 h-1 rounded-full"><div className="bg-yellow-500 h-full w-[33%] rounded-full transition-all" /></div>
+                <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-sm p-4">
+                    <h3 className="text-yellow-400 font-orbitron uppercase tracking-widest text-sm font-bold mb-2">🧩 {quickLogicPuzzle.title}</h3>
+                    <p className="text-gray-400 text-xs italic">Tests strategic thinking & logic (quick mental puzzle).</p>
+                </div>
+                <div className="bg-black border border-gray-700 p-4 rounded-sm flex-grow flex flex-col">
+                    <p className="text-gray-300 text-sm mb-4 font-mono">{quickLogicPuzzle.prompt}</p>
+                    <p className="text-gray-600 text-xs italic mb-4">💡 {quickLogicPuzzle.hint}</p>
+                    <textarea
+                        value={riverInput}
+                        onChange={(e) => setRiverInput(e.target.value)}
+                        placeholder="Describe your step-by-step solution..."
+                        className="w-full bg-black border border-gray-700 rounded-sm p-3 text-white font-mono text-xs flex-grow mb-4 focus:border-yellow-500 outline-none resize-none"
+                    />
+                    <button onClick={validateLogicPuzzle} disabled={riverInput.trim().length < 30} className="w-full bg-yellow-600 hover:bg-yellow-500 text-black font-orbitron py-3 tracking-widest uppercase text-xs transition-all disabled:opacity-30">SUBMIT ANSWER</button>
+                </div>
+            </div>
+        </TerminalShell>
+    );
+
+    if (phase === 'part1_feedback' && riverFeedback) return (
+        <TerminalShell title="Strategic Engine // Part 1 Results" accentClass="border-yellow-900/50">
+            <div className="flex flex-col h-full gap-4">
+                <div className="w-full bg-gray-900 h-1 rounded-full"><div className="bg-yellow-500 h-full w-[33%] rounded-full" /></div>
+                <div className="space-y-3">
+                    <div className="text-center">
+                        <div className="text-3xl font-bold text-yellow-400 mb-1">{riverFeedback.score}/30</div>
+                        <div className="text-xs text-yellow-600 font-orbitron tracking-widest uppercase">{riverFeedback.level}</div>
+                    </div>
+                    <div className={`p-4 rounded-sm text-sm border ${riverFeedback.score >= 25 ? 'bg-green-900/30 border-green-600 text-green-300' : riverFeedback.score >= 15 ? 'bg-blue-900/30 border-blue-600 text-blue-300' : 'bg-red-900/30 border-red-600 text-red-300'}`}>
+                        {riverFeedback.message}
+                    </div>
+                    <div className="bg-gray-900/30 p-3 border border-gray-700 rounded-sm text-xs text-gray-400 font-mono">
+                        <span className="text-gray-500 font-bold">Correct Answer:</span><br/>{quickLogicPuzzle.answer}
+                    </div>
+                </div>
+                <button onClick={continueToPart2} className="w-full bg-cyan-600 hover:bg-cyan-500 text-white font-orbitron py-3 tracking-widest uppercase text-xs mt-auto">PROCEED TO PART 2</button>
+            </div>
+        </TerminalShell>
+    );
+
+    if (phase === 'part2_briefing') return (
+        <TerminalShell title="Strategic Engine // Part 2: Chess Tactic" accentClass="border-green-900/50">
+            <div className="flex flex-col items-center justify-center text-center flex-grow py-12 space-y-8">
+                <div className="text-5xl">♔</div>
+                <h2 className="text-xl font-black font-orbitron text-green-400 uppercase tracking-[0.2em]">CHESS TACTIC</h2>
+                <div className="w-full bg-gray-900 h-1 rounded-full"><div className="bg-green-500 h-full w-[67%] rounded-full" /></div>
+                <div className="bg-gray-900/40 p-6 border border-green-900/30 rounded-sm max-w-2xl text-left space-y-4">
+                    <p className="text-gray-300 text-sm"><span className="text-green-400 font-bold">Protocol:</span> One key tactical puzzle testing calculation and candidate moves.</p>
+                    <p className="text-gray-400 text-xs italic">Identify the best move for White. Then briefly explain the strategic principle.</p>
+                </div>
+                <button onClick={() => setPhase('part2_puzzle')} className="btn-primary w-full max-w-xs font-orbitron tracking-[0.3em] py-5 uppercase text-sm bg-green-600 hover:bg-green-500">BEGIN PUZZLE</button>
+            </div>
+        </TerminalShell>
+    );
+
+    if (phase === 'part2_puzzle') return (
+        <TerminalShell title={`Strategic Engine // Puzzle ${chessPuzzleIndex + 1}/${chessPuzzles.length}`} accentClass="border-green-900/50">
+            <div className="flex flex-col h-full gap-4">
+                <div className="w-full bg-gray-900 h-1 rounded-full"><div className="bg-green-500 h-full rounded-full transition-all" style={{ width: `${chessProgress}%` }} /></div>
+                <div className="bg-green-500/10 border border-green-500/30 rounded-sm p-4">
+                    <h3 className="text-green-400 font-orbitron uppercase tracking-widest text-sm font-bold mb-2">{currentChessPuzzle.title}</h3>
+                    <p className="text-gray-400 text-xs italic">{currentChessPuzzle.description}</p>
+                </div>
+                <div className="bg-black border border-gray-700 p-4 rounded-sm">
+                    <div className="text-center space-y-2">
+                        <div className="text-gray-400 text-sm font-mono">{currentChessPuzzle.hint}</div>
+                        <div className="text-gray-600 text-xs italic">Strategic Concept: {currentChessPuzzle.strategicConcept}</div>
+                    </div>
+                </div>
+                {!chessShowReflection ? (
                     <div className="space-y-3">
-                        <label className="block text-xs text-gray-500 uppercase tracking-widest font-bold">Enter your best move:</label>
+                        <label className="block text-xs text-gray-500 uppercase tracking-widest font-bold">Your best move:</label>
                         <div className="flex gap-2">
-                            <input
-                                type="text"
-                                value={userMove}
-                                onChange={(e) => setUserMove(e.target.value)}
-                                placeholder="e.g., Nxe5, Bf4, O-O"
-                                className="flex-grow bg-black border border-gray-700 rounded-sm p-3 text-white font-mono focus:border-green-500 outline-none"
-                                onKeyDown={(e) => e.key === 'Enter' && validateMove()}
-                            />
-                            <button onClick={validateMove} disabled={!userMove.trim()} className="px-6 py-3 bg-green-600 hover:bg-green-500 text-black font-orbitron text-xs uppercase tracking-widest transition-all disabled:opacity-30">SUBMIT</button>
+                            <input type="text" value={chessMove} onChange={(e) => setChessMove(e.target.value)} placeholder="e.g., Nxe5, Qh7" className="flex-grow bg-black border border-gray-700 rounded-sm p-3 text-white font-mono focus:border-green-500 outline-none" onKeyDown={(e) => e.key === 'Enter' && validateChessMove()} />
+                            <button onClick={validateChessMove} disabled={!chessMove.trim()} className="px-6 py-3 bg-green-600 hover:bg-green-500 text-black font-orbitron text-xs uppercase tracking-widest transition-all disabled:opacity-30">SUBMIT</button>
                         </div>
                     </div>
                 ) : (
-                    <div className="space-y-3">
-                        {/* Feedback */}
-                        <div className={`p-3 rounded-sm text-sm ${isCorrect ? 'bg-green-900/30 border border-green-600 text-green-300' : 'bg-red-900/30 border border-red-600 text-red-300'}`}>
-                            {feedback}
+                    <div className="space-y-3 flex-grow flex flex-col">
+                        <div className={`p-3 rounded-sm text-sm ${chessIsCorrect ? 'bg-green-900/30 border border-green-600 text-green-300' : 'bg-red-900/30 border border-red-600 text-red-300'}`}>{chessFeedback}</div>
+                        <div className="space-y-2 flex-grow flex flex-col">
+                            <label className="block text-xs text-gray-500 uppercase tracking-widest font-bold">Reflect on this puzzle:</label>
+                            <textarea value={chessReflection} onChange={(e) => setChessReflection(e.target.value)} placeholder="What principle does this move show? Where would you use it?" className="w-full bg-black border border-gray-700 rounded-sm p-3 text-white font-mono text-xs resize-none flex-grow focus:border-green-500 outline-none" />
                         </div>
-
-                        {/* Reflection Prompt */}
-                        <div className="space-y-2">
-                            <label className="block text-xs text-gray-500 uppercase tracking-widest font-bold">Reflect on this position:</label>
-                            <textarea
-                                value={reflectionText}
-                                onChange={(e) => setReflectionText(e.target.value)}
-                                placeholder="What strategic principle does this move demonstrate? How would you apply this in future positions?"
-                                className="w-full bg-black border border-gray-700 rounded-sm p-3 text-white font-mono text-xs resize-none min-h-[80px] focus:border-green-500 outline-none"
-                            />
-                        </div>
-
-                        {/* Next Button */}
-                        <button
-                            onClick={handleReflectionSubmit}
-                            className="w-full bg-green-600 hover:bg-green-500 text-black font-orbitron py-3 tracking-widest uppercase text-xs transition-all"
-                        >
-                            {puzzleIndex === puzzles.length - 1 ? 'COMPLETE' : 'NEXT PUZZLE'}
-                        </button>
+                        <button onClick={handleChessReflectionSubmit} className="w-full bg-green-600 hover:bg-green-500 text-black font-orbitron py-3 tracking-widest uppercase text-xs">{chessPuzzleIndex === chessPuzzles.length - 1 ? 'NEXT TO PART 3' : 'NEXT PUZZLE'}</button>
                     </div>
                 )}
             </div>
         </TerminalShell>
     );
+
+    if (phase === 'part3_input') return (
+        <TerminalShell title="Strategic Engine // Part 3: Decision Scenario" accentClass="border-purple-900/50">
+            <div className="flex flex-col h-full gap-4">
+                <div className="w-full bg-gray-900 h-1 rounded-full"><div className="bg-purple-500 h-full w-[100%] rounded-full" /></div>
+                <div className="bg-purple-500/10 border border-purple-500/30 rounded-sm p-4">
+                    <h3 className="text-purple-400 font-orbitron uppercase tracking-widest text-sm font-bold mb-2">📊 {resourceScenario.title}</h3>
+                    <p className="text-gray-400 text-xs italic">Test resource prioritization under constraints.</p>
+                </div>
+                <div className="bg-black border border-gray-700 p-4 rounded-sm flex-grow overflow-y-auto space-y-4">
+                    <p className="text-gray-300 text-sm font-mono">{resourceScenario.prompt}</p>
+                    <div className="grid grid-cols-1 gap-3">
+                        {resourceScenario.tasks.map(task => (
+                            <div key={task.id} className="bg-gray-900 border border-gray-700 p-3 rounded-sm">
+                                <div className="text-sm font-bold text-white flex items-center gap-2">
+                                    <input type="radio" name="ranking" value={task.id} checked={resourceRanking[0] === task.id} readOnly className="w-4 h-4" />
+                                    <span>[{task.id}]</span> {task.name}
+                                </div>
+                                <div className="text-xs text-gray-500 ml-6">{task.desc}</div>
+                            </div>
+                        ))}
+                    </div>
+                    <div className="space-y-2">
+                        <label className="block text-xs text-purple-400 font-bold">Rank by priority (drag or list: A, B, C, D):</label>
+                        <input type="text" value={resourceRanking.join(', ')} onChange={(e) => setResourceRanking(e.target.value.split(',').map(s => s.trim().toUpperCase()).filter(s => ['A', 'B', 'C', 'D'].includes(s)))} placeholder="e.g., A, C, B, D" className="w-full bg-black border border-gray-700 rounded-sm p-2 text-white font-mono text-xs focus:border-purple-500 outline-none" />
+                    </div>
+                    <div className="space-y-2">
+                        <label className="block text-xs text-purple-400 font-bold">Justify your ranking (why this order?):</label>
+                        <textarea value={resourceJustification} onChange={(e) => setResourceJustification(e.target.value)} placeholder="Explain trade-offs and risk impact..." className="w-full bg-black border border-gray-700 rounded-sm p-2 text-white font-mono text-xs resize-none h-12 focus:border-purple-500 outline-none" />
+                    </div>
+                    <div className="space-y-2">
+                        <label className="block text-xs text-purple-400 font-bold">Contingency plan (if top priority fails, what's Plan B?):</label>
+                        <textarea value={resourceContingency} onChange={(e) => setResourceContingency(e.target.value)} placeholder="If [priority] fails, then I would..." className="w-full bg-black border border-gray-700 rounded-sm p-2 text-white font-mono text-xs resize-none h-12 focus:border-purple-500 outline-none" />
+                    </div>
+                </div>
+                <div className="space-y-2">
+                    {resourceFeedback && <div className="text-xs text-red-400 bg-red-900/20 p-2 rounded border border-red-600/30">{resourceFeedback}</div>}
+                    <button onClick={validateResourcePrioritization} className="w-full bg-purple-600 hover:bg-purple-500 text-white font-orbitron py-3 tracking-widest uppercase text-xs">SUBMIT RANKING</button>
+                </div>
+            </div>
+        </TerminalShell>
+    );
+
+    if (phase === 'part3_feedback') return (
+        <TerminalShell title="Strategic Engine // Part 3 Results" accentClass="border-purple-900/50">
+            <div className="flex flex-col h-full gap-4">
+                <div className="text-center">
+                    <div className="text-3xl font-bold text-purple-400 mb-1">{resourceScore}/20</div>
+                    <div className="text-xs text-purple-600 font-orbitron tracking-widest uppercase">Decision Quality</div>
+                </div>
+                <div className={`p-4 rounded-sm text-sm border ${resourceScore >= 15 ? 'bg-green-900/30 border-green-600 text-green-300' : resourceScore >= 10 ? 'bg-blue-900/30 border-blue-600 text-blue-300' : 'bg-red-900/30 border-red-600 text-red-300'}`}>{resourceFeedback}</div>
+                <button onClick={() => { setPhase('complete'); setTimeout(() => completeAssessment(), 1500); }} className="w-full bg-cyan-600 hover:bg-cyan-500 text-white font-orbitron py-3 tracking-widest uppercase text-xs mt-auto">FINALIZE ASSESSMENT</button>
+            </div>
+        </TerminalShell>
+    );
+
+    if (phase === 'complete') return (
+        <TerminalShell title="Strategic Engine // Assessment Complete" accentClass="border-cyan-900/50">
+            <div className="flex flex-col items-center justify-center flex-grow py-12 space-y-4">
+                <Check className="w-16 h-16 text-cyan-500" />
+                <h2 className="text-xl font-black font-orbitron text-cyan-400 uppercase tracking-widest">STRATEGY MATRIX COMPLETE</h2>
+                <p className="text-gray-500 font-mono text-xs">Processing 3-part assessment results...</p>
+            </div>
+        </TerminalShell>
+    );
+
+    return null;
 };
 
 const SimonSaysTest: React.FC<{ onComplete: (result: any) => void }> = ({ onComplete }) => {
@@ -1267,7 +1931,43 @@ const SimonSaysTest: React.FC<{ onComplete: (result: any) => void }> = ({ onComp
         startLevel([]);
     };
 
-    const handleFinish = () => onComplete({ maxLevel: level });
+    const handleFinish = () => {
+        // Calculate additional metrics beyond max level
+        const totalButtons = sequenceRef.current.length;
+        const errorPoint = userSeqRef.current.length; // How far user got before error
+        const progressPercentage = (errorPoint / Math.max(totalButtons, 1)) * 100;
+        const MIN_LEVELS = 5; // Minimum engagement threshold
+        const incompleteFlag = level < MIN_LEVELS;
+        
+        // Map to substats:
+        // - Adaptability: Based on how many sequences completed (learning curve)
+        // - Resilience: Based on progress despite failures
+        // - Focus: Based on sequence length (longer = better focus)
+        // - Perception: Based on pattern recognition (level)
+        const adaptabilityScore = Math.min(95, (level / 25) * 100);
+        const resilienceScore = Math.min(95, 40 + progressPercentage * 0.5);
+        const focusScore = Math.min(95, 30 + (level / 25) * 60);
+        const perceptionScore = Math.min(95, (level / 25) * 100);
+        
+        // Learning curve: check for consistent progression
+        const learningRate = Math.min(100, (level / 10) * 100);
+        
+        onComplete({ 
+            maxLevel: level,
+            totalSequenceLength: totalButtons,
+            errorPoint: errorPoint,
+            progressPercentage: progressPercentage,
+            incomplete: incompleteFlag, // Flag if quit before MIN_LEVELS
+            learningRate,
+            // Substat contributions for integration
+            substatContributions: {
+                Adaptability: adaptabilityScore,
+                Resilience: resilienceScore,
+                Focus: focusScore,
+                Perception: perceptionScore
+            }
+        });
+    };
 
     const buttonColors = [
         'bg-red-600', 'bg-red-700', 'bg-red-500', 'bg-red-800',
@@ -1311,12 +2011,19 @@ const SimonSaysTest: React.FC<{ onComplete: (result: any) => void }> = ({ onComp
 
                         {/* Finish Button */}
                         {phase === 'gameover' && (
-                            <button 
-                                onClick={handleFinish} 
-                                className="btn-primary w-full font-orbitron tracking-widest uppercase py-3"
-                            >
-                                SUBMIT RESULTS
-                            </button>
+                            <div className="space-y-2">
+                                {level < 5 && (
+                                    <div className="bg-yellow-900/40 border border-yellow-700 p-3 rounded text-xs text-yellow-300 font-mono text-center">
+                                        WARNING: Minimum 5 levels recommended. You reached {level}. Results will be flagged as incomplete.
+                                    </div>
+                                )}
+                                <button 
+                                    onClick={handleFinish}
+                                    className="w-full btn-primary font-orbitron tracking-widest uppercase py-3"
+                                >
+                                    FINISH ({level < 5 ? 'INCOMPLETE' : 'COMPLETE'})
+                                </button>
+                            </div>
                         )}
                     </div>
                 )}
@@ -1335,67 +2042,34 @@ export const OnboardingPage: React.FC = () => {
     const [report, setReport] = useState<FullCalibrationReport | null>(null);
     const [showSkipConfirm, setShowSkipConfirm] = useState(false);
 
-    const handleStepComplete = (data: any) => {
+    const handleStepComplete = async (data: any) => {
         const step = CALIBRATION_BENCHMARKS[stepIndex];
         const newInputs = { ...allInputs, [step.id]: data };
         setAllInputs(newInputs);
         if (stepIndex < CALIBRATION_BENCHMARKS.length - 1) setStepIndex(stepIndex + 1);
-        else finalizeOnboarding(newInputs);
+        else await finalizeOnboarding(newInputs);
+    };
+
+    const handleSkipStep = async () => {
+        // Skip current step - move to next without saving current step's data
+        setShowSkipConfirm(false);
+        if (stepIndex < CALIBRATION_BENCHMARKS.length - 1) {
+            setStepIndex(stepIndex + 1);
+        } else {
+            // At last step - finalize with collected data
+            await finalizeOnboarding(allInputs);
+        }
     };
 
     const handleSkipOnboarding = async () => {
+        // Complete skip - bypass all remaining steps and finalize with current collected data
         setShowSkipConfirm(false);
         setIsFinalizing(true);
         try {
-            // Create minimal default report with baseline stats
-            const defaultStats = INITIAL_STATS.map(s => ({
-                ...s,
-                value: 5000,
-                rank: AttributeRankName.C,
-                lastIncreased: new Date().toISOString(),
-                subStats: (STAT_SUBSTAT_MAP[s.name as StatName] || []).map(ssName => ({
-                    name: ssName,
-                    value: 1000,
-                    rank: AttributeRankName.C,
-                    lastIncreased: new Date().toISOString()
-                }))
-            }));
-
-            const defaultReport: FullCalibrationReport = {
-                talentClass: 'Average',
-                obsessionLevel: 'Average',
-                archetypeTitle: 'UNALIGNED_ASSET',
-                rarity: 'Optimized',
-                traitScores: { IP: 50, LE: 50, RE: 50, FO: 50, EX: 50, CO: 50 },
-                codename: gameState?.userName?.toUpperCase() || 'ASSET',
-                mbtiProfile: 'INTJ',
-                symbolicProfile: 'Contemplative',
-                threatLevel: 'Baseline',
-                foreshadowing: 'Growth potential unassessed.',
-                ceilingRarity: 'Optimized',
-                deviation: 'Standard',
-                notes: 'Skipped detailed onboarding calibration.',
-                resonanceStability: 'Neutral',
-                centralInsight: 'Initial state achieved.',
-                rarityBand: 'Optimized',
-                candidateTitles: [],
-                tpi: 50,
-                percentile: 50,
-                overallRank: AttributeRankName.C,
-                initialStatsSnapshot: defaultStats,
-                estimatedCeilingRank: AttributeRankName.B,
-                talentDna: { BP: 0.5, LV: 0.5, DR: 0.5 },
-                primaryFailureNode: 'Unknown',
-                failureNodeRisk: 'Unassessed',
-                successProbability: 0.5,
-                dropoutProbability: 0.1,
-                historicalPrecedent: { name: 'Baseline Human', matchPercentage: 50, alignment: 'Neutral' },
-                biometricModifiers: [],
-                noteworthyFeats: []
-            };
-
-            setReport(defaultReport);
+            // Finalize with whatever data was collected so far
+            await finalizeOnboarding(allInputs);
         } catch (error) {
+            console.error('Skip onboarding error:', error);
             addToast("Skip failed. Continue onboarding.", "error");
             setIsFinalizing(false);
         }
@@ -1411,6 +2085,10 @@ export const OnboardingPage: React.FC = () => {
             const simonSays = inputs['simon-says-test'] || {};
             const psycheSocial = inputs['psyche-social-questionnaire'] || {};
             const vitality = inputs['vitality-questionnaire'] || {};
+            const fittsLaw = inputs['fitts-law-test'] || {};
+            const stroop = inputs['resilience-stroop'] || {};
+            const dilemmas = inputs['dilemma-screening'] || {};
+            const strategy = inputs['high-stakes-war-room'] || {};
 
             // Extract questionnaire responses for Spirit and Psyche substats
             const faithPercentile = parseInt(psycheSocial.religiosity) || 50;
@@ -1426,7 +2104,6 @@ export const OnboardingPage: React.FC = () => {
             const creativityData = inputs['creative-protocol-test'];
             if (creativityData) {
                 try {
-                    const { calculateHATI } = require('../data/creativityAssessmentFinal');
                     const creativityScores = await evaluateCreativityAnswers(creativityData);
                     // Calculate average percentile across all 5 substats
                     const substats = ['Imagination', 'Innovation', 'Style', 'Vision', 'Expression'];
@@ -1451,8 +2128,7 @@ export const OnboardingPage: React.FC = () => {
                 substatsPercentiles[SubStatName.Expression] = creativitySubstats['Expression']?.percentile || 50;
             }
 
-            // Import interpolate function from services
-            const { interpolate } = require('../services/scoringService');
+            // interpolate is already imported at the top
 
             // Convert all substats to values and build stats array
             const stats: Stat[] = INITIAL_STATS.map(s => {
@@ -1502,23 +2178,112 @@ export const OnboardingPage: React.FC = () => {
             const traitResult = performTraitAnalysis(metrics, inputs);
             const codename = generateCodename(gameState?.userName || 'Asset');
             const feats: FullCalibrationReport['noteworthyFeats'] = [];
-            if ((equilibrium as any).score >= 92) feats.push({ label: 'SYSTEM_EQUILIBRIUM', value: 'S-TIER', rarity: 'Elite', desc: 'Maintained systemic sync under complex ripple feedback.' });
+            if ((equilibrium as any).reasoningScore >= 80) feats.push({ label: 'APEX_REASONING', value: 'S-TIER', rarity: 'Elite', desc: 'Demonstrated exceptional logical and strategic reasoning.' });
 
-            const fullReport = await generateFullCalibrationReport({
-                metrics, traits: traitResult, narrative: inputs['narrative-prompt']?.['narrative-prompt'] || "",
-                mbtType: inputs['mbti-assessment']?.mbtiResult || "INTJ", codename, biometrics: inputs['biometric-data']
-            });
-
-            const finalReport: FullCalibrationReport = {
-                ...fullReport, ...traitResult, tpi: calculateScores(stats).apexThreatIndex,
-                percentile: calculateScores(stats).apexThreatIndex, overallRank: mapScoreToRank(calculateScores(stats).apexThreatIndex),
-                initialStatsSnapshot: stats, estimatedCeilingRank: calculateCeilingRank(mapScoreToRank(calculateScores(stats).apexThreatIndex), traitResult.talentClass),
-                // Removed 'rankSnapshots' which is not defined in FullCalibrationReport interface
-                talentDna: calculateTalentDistribution(metrics, inputs).dna, noteworthyFeats: feats
+            // Generate report with error handling
+            let fullReport: any = {
+                tpi: 52,
+                percentile: 52,
+                codename,
+                talentClass: traitResult.talentClass || 'Average',
+                obsessionLevel: traitResult.obsessionLevel || 'Average',
+                archetypeTitle: traitResult.archetypeTitle || 'Seeker',
+                mbtiProfile: inputs['mbti-assessment']?.mbtiResult || 'INTJ',
+                rarityBand: 'UNCLASSIFIED',
+                centralInsight: 'Your profile reveals balanced potential across cognitive and physical domains. Recommend immediate engagement with specialized training protocols to unlock latent capacity.',
+                primaryFailureNode: 'Consistency maintenance under extended operational stress',
+                failureNodeRisk: 'Prolonged high-intensity tasks without recovery intervals',
+                successProbability: 68,
+                dropoutProbability: 18,
+                biometricModifiers: [
+                    'Baseline fitness indicates foundational athletic capacity',
+                    'Cognitive performance suggests strategic thinking potential',
+                    'Psychological resilience within acceptable parameters'
+                ],
+                historicalPrecedent: { name: 'Asset Prime', alignment: 'Emerging operative with broad competency', matchPercentage: 71 }
             };
-            setReport(finalReport);
-        } catch (error) { addToast("Calibration error. Simulation Engaged.", "error"); }
-        finally { setIsFinalizing(false); }
+            let finalReport: any = null;
+
+            try {
+                const generatedReport = await generateFullCalibrationReport({
+                    metrics, traits: traitResult, narrative: inputs['narrative-prompt']?.['narrative-prompt'] || "",
+                    mbtType: inputs['mbti-assessment']?.mbtiResult || "INTJ", codename, biometrics: inputs['biometric-data']
+                });
+                fullReport = { ...generatedReport };
+            } catch (e) {
+                console.warn('Report generation partial - using defaults', e);
+            }
+
+            try {
+                console.log('Starting finalReport construction...');
+                let scores: any = null;
+                try {
+                    scores = calculateScores(stats);
+                    console.log('✓ Scores calculated:', scores);
+                } catch (e) {
+                    console.error('✗ calculateScores failed:', e);
+                    scores = { apexThreatIndex: 50 };
+                }
+
+                let talentDist: any = null;
+                try {
+                    talentDist = calculateTalentDistribution(metrics, inputs);
+                    console.log('✓ Talent distribution calculated');
+                } catch (e) {
+                    console.error('✗ calculateTalentDistribution failed:', e);
+                    talentDist = { dna: [] };
+                }
+
+                finalReport = {
+                    ...fullReport,
+                    ...traitResult,
+                    tpi: scores.apexThreatIndex,
+                    percentile: scores.apexThreatIndex,
+                    overallRank: mapScoreToRank(scores.apexThreatIndex),
+                    initialStatsSnapshot: stats,
+                    estimatedCeilingRank: calculateCeilingRank(mapScoreToRank(scores.apexThreatIndex), traitResult.talentClass),
+                    talentDna: talentDist.dna,
+                    noteworthyFeats: feats
+                } as FullCalibrationReport;
+                setReport(finalReport);
+                console.log('✓ Final report set successfully');
+            } catch (error) { 
+                console.error('Finalization error:', error);
+                console.error('Error details:', {
+                    errorMessage: (error as any)?.message,
+                    errorStack: (error as any)?.stack,
+                    statsLength: stats?.length
+                });
+                // Use the fallback report
+                console.warn('Using fallback report...');
+                setReport(fullReport as any as FullCalibrationReport);
+                addToast("Calibration processed with defaults.", "error"); 
+            }
+            finally { setIsFinalizing(false); }
+        } catch (outerError) { 
+            console.error('Outer finalization error:', outerError);
+            console.error('Error stack:', (outerError as any)?.stack);
+            // Still set a fallback report so users aren't stuck
+            const fallbackCodename = generateCodename(gameState?.userName || 'Asset');
+            const fallbackReport = {
+                tpi: 50,
+                percentile: 50,
+                codename: fallbackCodename,
+                talentClass: 'Seeker',
+                obsessionLevel: 'Average',
+                archetypeTitle: 'Seeker',
+                centralInsight: 'Calibration processed with minimal data. See console for details.',
+                historicalPrecedent: { name: 'You', alignment: 'Beginning your Genesis journey', matchPercentage: 0 },
+                initialStatsSnapshot: INITIAL_STATS,
+                overallRank: 'Initiate',
+                estimatedCeilingRank: 'Ascendant',
+                talentDna: [],
+                noteworthyFeats: []
+            } as any as FullCalibrationReport;
+            setReport(fallbackReport);
+            addToast("Calibration completed with defaults. Check console for details.", "error");
+            setIsFinalizing(false);
+        }
     };
 
     const step = CALIBRATION_BENCHMARKS[stepIndex];
@@ -1534,20 +2299,26 @@ export const OnboardingPage: React.FC = () => {
             {showSkipConfirm && (
                 <div className="fixed inset-0 bg-black/80 z-[300] flex items-center justify-center p-4">
                     <div className="bg-gray-900 border border-purple-500/30 rounded-sm p-6 max-w-sm w-full space-y-4">
-                        <h2 className="text-lg font-orbitron font-bold text-purple-400 uppercase">SKIP CALIBRATION?</h2>
-                        <p className="text-sm text-gray-300">Skipping will assign baseline statistics. You can refine your profile later through gameplay.</p>
-                        <div className="flex gap-3">
+                        <h2 className="text-lg font-orbitron font-bold text-purple-400 uppercase">SKIP OPTIONS</h2>
+                        <p className="text-sm text-gray-300">Choose to skip this step or bypass all remaining calibration.</p>
+                        <div className="space-y-3">
                             <button
-                                onClick={() => setShowSkipConfirm(false)}
-                                className="flex-1 px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white font-orbitron uppercase text-xs transition-all rounded-sm"
+                                onClick={handleSkipStep}
+                                className="w-full px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white font-orbitron uppercase text-xs transition-all rounded-sm"
                             >
-                                Continue
+                                Skip This Step
                             </button>
                             <button
                                 onClick={handleSkipOnboarding}
-                                className="flex-1 px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white font-orbitron uppercase text-xs transition-all rounded-sm"
+                                className="w-full px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white font-orbitron uppercase text-xs transition-all rounded-sm"
                             >
-                                Skip
+                                Skip All Remaining
+                            </button>
+                            <button
+                                onClick={() => setShowSkipConfirm(false)}
+                                className="w-full px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 font-orbitron uppercase text-xs transition-all rounded-sm"
+                            >
+                                Cancel
                             </button>
                         </div>
                     </div>
@@ -1591,7 +2362,7 @@ export const OnboardingPage: React.FC = () => {
                 {step.type === 'resilience-stroop' && <ResilienceStroop onComplete={handleStepComplete} />}
                 {step.id === 'ai-adaptive-reasoning' && <EquilibriumReasoningTask onComplete={handleStepComplete} />}
                 {step.id === 'adaptive-knowledge-test' && <AdaptiveKnowledgeTest onComplete={handleStepComplete} />}
-                {step.id === 'high-stakes-war-room' && <ChessStrategyTest onComplete={handleStepComplete} />}
+                {step.id === 'high-stakes-war-room' && <StrategyAssessment3Part onComplete={handleStepComplete} />}
                 {step.type === 'dilemma-screening' && <DilemmaScreening onComplete={handleStepComplete} />}
                 {step.type === 'creative-protocol-test' && <CreativeProtocolTest onComplete={handleStepComplete} />}
             </div>
