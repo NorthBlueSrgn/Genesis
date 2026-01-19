@@ -2,8 +2,8 @@
 // components/ClassifiedDossier.tsx
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { FullCalibrationReport, TalentDna, TalentClass, ObsessionLevel, AttributeRankName } from '../types';
-import { Fingerprint, ShieldAlert, Zap, TrendingUp, BrainCircuit, Target, AlertTriangle, History, Activity, Database, Cpu, Search, Lock, UserCheck, ShieldCheck, ChevronRight, Binary, Signal, AlertOctagon, Star, Award, Shield } from 'lucide-react';
-import { ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, Tooltip } from 'recharts';
+import { Fingerprint, ShieldAlert, Zap, TrendingUp, BrainCircuit, Target, AlertTriangle, History, Activity, Database, Cpu, Search, Lock, UserCheck, ShieldCheck, ChevronRight, Binary, Signal, AlertOctagon, Star, Award, Shield, ArrowUpRight, BarChart3 } from 'lucide-react';
+import { ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, Cell } from 'recharts';
 
 interface ClassifiedDossierProps {
     report: FullCalibrationReport;
@@ -23,85 +23,98 @@ const rankGlowMap: Record<AttributeRankName, string> = {
     'SS+': 'shadow-cyan-900/80',
 };
 
-const SingularityMap: React.FC<{ talentClass: TalentClass; obsessionLevel: ObsessionLevel; drive: number }> = ({ talentClass, obsessionLevel, drive }) => {
-    const xMap: Record<ObsessionLevel, number> = { 
-        'Lazy': 15, 'Average': 35, 'Locked-In': 55, 'Relentless': 80, 'Compulsive': 94 
+// Singularity Plot: Clean grid showing Talent (Y) vs Obsession (X)
+const SingularityPlot: React.FC<{ talentClass: TalentClass; obsessionLevel: ObsessionLevel }> = ({ talentClass, obsessionLevel }) => {
+    const talentMap: Record<TalentClass, { y: number; label: string }> = {
+        'Laggard': { y: 20, label: 'LAGGARD' },
+        'Average': { y: 40, label: 'AVERAGE' },
+        'Talented Learner': { y: 60, label: 'TALENTED' },
+        'Gifted': { y: 80, label: 'GIFTED' },
+        'Genius': { y: 95, label: 'GENIUS' }
     };
-    const yMap: Record<TalentClass, number> = { 
-        'Laggard': 15, 'Average': 35, 'Talented Learner': 55, 'Gifted': 80, 'Genius': 94 
+
+    const obsessionMap: Record<ObsessionLevel, { x: number; label: string }> = {
+        'Lazy': { x: 20, label: 'LAZY' },
+        'Average': { x: 40, label: 'AVERAGE' },
+        'Locked-In': { x: 60, label: 'LOCKED-IN' },
+        'Relentless': { x: 80, label: 'RELENTLESS' },
+        'Compulsive': { x: 95, label: 'COMPULSIVE' }
     };
-    
-    const userX = xMap[obsessionLevel];
-    const userY = yMap[talentClass];
-    
-    const vectorStrength = drive * 15;
-    const projectedPoint = { 
-        x: Math.min(98, userX + (vectorStrength * 0.2)), 
-        y: Math.min(98, userY + vectorStrength) 
-    };
+
+    const userX = obsessionMap[obsessionLevel].x;
+    const userY = talentMap[talentClass].y;
 
     return (
-        <div className="relative w-full h-full bg-[#050505] border border-purple-900/30 rounded-sm overflow-hidden group">
-            <div className="absolute inset-0 grid grid-cols-2 grid-rows-2 opacity-[0.03] pointer-events-none z-0">
-                <div className="border-r border-b border-white p-4"><span className="text-[10px] font-black uppercase">Stagnant Reservoir</span></div>
-                <div className="border-b border-white p-4 text-right"><span className="text-[10px] font-black uppercase text-purple-500">Apex Convergence</span></div>
-                <div className="border-r border-white p-4 flex items-end"><span className="text-[10px] font-black uppercase">Functional Baseline</span></div>
-                <div className="p-4 flex items-end justify-end"><span className="text-[10px] font-black uppercase text-cyan-400">Transcendent Burnout</span></div>
-            </div>
-
-            <svg viewBox="0 0 100 100" className="absolute inset-0 w-full h-full pointer-events-none z-10">
+        <div className="relative w-full h-[350px] bg-black border border-gray-800 rounded-sm overflow-hidden">
+            <svg viewBox="0 0 500 350" className="w-full h-full">
                 <defs>
-                    <radialGradient id="apexGlow" cx="50%" cy="50%" r="50%">
-                        <stop offset="0%" stopColor="#a855f7" stopOpacity="0.1" />
-                        <stop offset="100%" stopColor="#a855f7" stopOpacity="0" />
-                    </radialGradient>
-                    <filter id="nodeGlow">
-                        <feGaussianBlur stdDeviation="1" result="blur" />
-                        <feComposite in="SourceGraphic" in2="blur" operator="over" />
-                    </filter>
+                    <linearGradient id="topRight" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stopColor="#10b981" stopOpacity="0.1" />
+                        <stop offset="100%" stopColor="#10b981" stopOpacity="0" />
+                    </linearGradient>
+                    <linearGradient id="topLeft" x1="100%" y1="0%" x2="0%" y2="100%">
+                        <stop offset="0%" stopColor="#8b5cf6" stopOpacity="0.1" />
+                        <stop offset="100%" stopColor="#8b5cf6" stopOpacity="0" />
+                    </linearGradient>
                 </defs>
-                
-                {[20, 40, 60, 80].map(val => (
-                    <React.Fragment key={val}>
-                        <line x1={val} y1="0" x2={val} y2="100" stroke="#1a1a1a" strokeWidth="0.2" />
-                        <line x1="0" y1={val} x2="100" y2={val} stroke="#1a1a1a" strokeWidth="0.2" />
-                    </React.Fragment>
+
+                {/* Grid background */}
+                {[50, 100, 150, 200, 250, 300, 350, 400, 450].map(x => (
+                    <line key={`v${x}`} x1={x} y1="30" x2={x} y2="330" stroke="#333" strokeWidth="1" strokeDasharray="2,2" />
+                ))}
+                {[50, 100, 150, 200, 250, 300].map(y => (
+                    <line key={`h${y}`} x1="50" y1={30 + y} x2="450" y2={30 + y} stroke="#333" strokeWidth="1" strokeDasharray="2,2" />
                 ))}
 
-                <line 
-                    x1={userX} y1={100 - userY} 
-                    x2={projectedPoint.x} y2={100 - projectedPoint.y} 
-                    stroke="#a855f7" 
-                    strokeWidth="0.5" 
-                    strokeDasharray="1,1"
-                    className="animate-pulse"
-                />
-                
-                <g transform={`translate(${userX}, ${100 - userY})`}>
-                    <circle r="4" fill="url(#apexGlow)" />
-                    <circle r="1.5" fill="#a855f7" filter="url(#nodeGlow)">
-                        <animate attributeName="r" values="1.2;1.8;1.2" dur="2s" repeatCount="indefinite" />
-                    </circle>
-                    <text x="3" y="-3" fontSize="2" fill="#fff" fontWeight="900" className="font-orbitron">ACTIVE_ASSET</text>
-                </g>
-                
-                {[
-                    { x: 95, y: 92, label: 'LEONARDO' },
-                    { x: 92, y: 35, label: 'GOGGINS' },
-                    { x: 50, y: 50, label: 'MEAN_HUMAN' },
-                    { x: 85, y: 78, label: 'ELITE_OP' }
-                ].map((ref, i) => (
-                    <g key={i} transform={`translate(${ref.x}, ${100 - ref.y})`} opacity="0.2">
-                        <rect x="-0.5" y="-0.5" width="1" height="1" fill="#444" />
-                        <text x="1.5" y="0.5" fontSize="1.5" fill="#666" className="font-mono">{ref.label}</text>
+                {/* Quadrant backgrounds */}
+                <rect x="250" y="30" width="200" height="150" fill="url(#topRight)" />
+                <rect x="50" y="180" width="200" height="150" fill="url(#topLeft)" />
+
+                {/* Axis lines */}
+                <line x1="50" y1="30" x2="50" y2="330" stroke="#666" strokeWidth="2" />
+                <line x1="50" y1="330" x2="450" y2="330" stroke="#666" strokeWidth="2" />
+
+                {/* Axis labels */}
+                <text x="240" y="25" fontSize="12" fontWeight="900" fill="#999" textAnchor="middle">TALENT CLASS</text>
+                <text x="25" y="180" fontSize="12" fontWeight="900" fill="#999" textAnchor="middle" transform="rotate(-90 25 180)">OBSESSION LEVEL</text>
+
+                {/* Y-axis labels (Talent) */}
+                {Object.entries(talentMap).map(([key, val]) => (
+                    <g key={key}>
+                        <line x1="45" y1={30 + (300 - val.y * 3)} x2="50" y2={30 + (300 - val.y * 3)} stroke="#666" strokeWidth="2" />
+                        <text x="35" y={30 + (300 - val.y * 3) + 4} fontSize="10" fontWeight="bold" fill="#aaa" textAnchor="end">{val.label}</text>
                     </g>
                 ))}
+
+                {/* X-axis labels (Obsession) */}
+                {Object.entries(obsessionMap).map(([key, val]) => (
+                    <g key={key}>
+                        <line x1={50 + val.x * 4} y1="330" x2={50 + val.x * 4} y2="335" stroke="#666" strokeWidth="2" />
+                        <text x={50 + val.x * 4} y="350" fontSize="10" fontWeight="bold" fill="#aaa" textAnchor="middle">{val.label}</text>
+                    </g>
+                ))}
+
+                {/* User position marker */}
+                <circle cx={50 + userX * 4} cy={30 + (300 - userY * 3)} r="8" fill="none" stroke="#a855f7" strokeWidth="2" />
+                <circle cx={50 + userX * 4} cy={30 + (300 - userY * 3)} r="4" fill="#a855f7" />
+                <text x={50 + userX * 4} y={30 + (300 - userY * 3) - 15} fontSize="11" fontWeight="900" fill="#a855f7" textAnchor="middle">YOU</text>
+
+                {/* Reference points */}
+                {[
+                    { x: 95, y: 95, label: 'SINGULARITY', color: '#fbbf24' },
+                    { x: 20, y: 20, label: 'STAGNANT', color: '#ef4444' },
+                    { x: 95, y: 20, label: 'UNDISCIPLINED', color: '#f97316' }
+                ].map((ref, i) => (
+                    <g key={i} opacity="0.4">
+                        <rect x={50 + ref.x * 4 - 3} y={30 + (300 - ref.y * 3) - 3} width="6" height="6" fill={ref.color} />
+                        <text x={50 + ref.x * 4} y={30 + (300 - ref.y * 3) - 12} fontSize="8" fontWeight="bold" fill={ref.color} textAnchor="middle">{ref.label}</text>
+                    </g>
+                ))}
+
+                {/* Labels for quadrants */}
+                <text x="350" y="60" fontSize="11" fontWeight="900" fill="#10b98144" textAnchor="middle">HIGH PERFORMER</text>
+                <text x="150" y="280" fontSize="11" fontWeight="900" fill="#8b5cf644" textAnchor="middle">EFFORT HERO</text>
             </svg>
-            
-            <div className="absolute bottom-2 right-2 flex flex-col items-end">
-                <span className="text-[7px] text-gray-700 font-black uppercase tracking-[0.3em]">Neural_Vector_Correlation</span>
-                <span className="text-[6px] text-purple-900 font-bold uppercase italic">Simulating 6-Month Trajectory...</span>
-            </div>
         </div>
     );
 };
@@ -212,7 +225,7 @@ export const ClassifiedDossier: React.FC<ClassifiedDossierProps> = ({ report, on
                                 <div className="absolute inset-0 bg-gradient-to-b from-transparent via-purple-500/20 to-transparent h-1 animate-scan" />
                                 <Search className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-purple-500 opacity-20 group-hover:opacity-60 transition-opacity" size={40} />
                             </div>
-                            <h3 className="text-2xl font-black font-orbitron text-white tracking-widest uppercase">{report.archetypeTitle}</h3>
+                            <h3 className="text-2xl font-black font-orbitron text-white tracking-widest uppercase">{report.talentClass}</h3>
                             <div className="flex gap-2 mt-2">
                                 <span className="text-[8px] font-black border border-purple-500/50 px-2 py-0.5 text-purple-400 uppercase tracking-tighter">{report.rarityBand}</span>
                                 <span className="text-[8px] font-black border border-cyan-500/50 px-2 py-0.5 text-cyan-400 uppercase tracking-tighter">MBTI: {report.mbtiProfile.split(':')[0] || 'UNK'}</span>
@@ -278,47 +291,46 @@ export const ClassifiedDossier: React.FC<ClassifiedDossierProps> = ({ report, on
                         <h2 className="text-xl font-black font-orbitron text-white tracking-widest uppercase">Neural architecture mapping</h2>
                     </div>
 
-                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-[500px]">
-                        <div className="lg:col-span-8 relative">
-                             <div className="absolute top-4 left-4 z-20 flex flex-col gap-1">
-                                <span className="text-[10px] text-white font-black bg-purple-900/80 px-2 py-0.5 flex items-center gap-2"><TrendingUp size={12} /> POTENTIAL SINGULARITY PLOT</span>
-                                <span className="text-[7px] text-gray-500 font-mono italic tracking-tighter">CROSS-VECTOR ANALYSIS OF INNATE TALENT VS. BEHAVIORAL OBSESSION</span>
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                        <div className="lg:col-span-8">
+                             <div className="mb-4 flex flex-col gap-1">
+                                <h3 className="text-[10px] text-white font-black bg-purple-900/60 px-3 py-1.5 flex items-center gap-2 w-fit rounded-sm"><TrendingUp size={12} /> TALENT VS OBSESSION MATRIX</h3>
+                                <span className="text-[8px] text-gray-500 font-mono italic tracking-tighter">Your position in the learning velocity / psychological adherence space</span>
                              </div>
-                             <SingularityMap 
+                             <SingularityPlot 
                                 talentClass={report.talentClass} 
-                                obsessionLevel={report.obsessionLevel} 
-                                drive={report.talentDna.DR} 
+                                obsessionLevel={report.obsessionLevel}
                              />
                         </div>
-                        <div className="lg:col-span-4 bg-black/40 border border-gray-800 p-6 flex flex-col items-center relative overflow-hidden">
+                        <div className="lg:col-span-4 bg-black/60 border border-gray-800 p-6 flex flex-col relative overflow-hidden">
                             <div className="absolute inset-0 bg-film-grain !opacity-[0.04]" />
-                            <h3 className="text-[9px] font-black text-gray-500 uppercase tracking-[0.3em] mb-8 text-center">Comparative Performance Index</h3>
-                            <div className="flex-grow w-full relative">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <RadarChart cx="50%" cy="50%" outerRadius="75%" data={[
-                                        { s: 'Potential', A: report.talentDna.BP * 100, B: 45 },
-                                        { s: 'Velocity', A: report.talentDna.LV * 100, B: 30 },
-                                        { s: 'Drive', A: report.talentDna.DR * 100, B: 50 },
+                            <h3 className="text-[9px] font-black text-gray-400 uppercase tracking-[0.3em] mb-6 text-center">Performance Profile Index</h3>
+                            <div className="flex-grow">
+                                <ResponsiveContainer width="100%" height={200}>
+                                    <BarChart data={[
+                                        { name: 'Potential', value: Math.round(report.talentDna.BP * 100), fill: '#a855f7' },
+                                        { name: 'Velocity', value: Math.round(report.talentDna.LV * 100), fill: '#06b6d4' },
+                                        { name: 'Drive', value: Math.round(report.talentDna.DR * 100), fill: '#f97316' }
                                     ]}>
-                                        <PolarGrid stroke="#222" />
-                                        <PolarAngleAxis dataKey="s" tick={{ fill: '#444', fontSize: 8, fontWeight: 900 }} />
-                                        <PolarRadiusAxis domain={[0, 100]} hide />
-                                        {/* Baseline Human Shadow */}
-                                        <Radar name="Mean Human" dataKey="B" stroke="#444" fill="#444" fillOpacity={0.1} />
-                                        {/* Asset Stats */}
-                                        <Radar name="Active Asset" dataKey="A" stroke="#a855f7" fill="#a855f7" fillOpacity={0.4} strokeWidth={2} />
-                                        <Tooltip contentStyle={{ backgroundColor: '#000', border: '1px solid #333', fontSize: '10px' }} />
-                                    </RadarChart>
+                                        <CartesianGrid strokeDasharray="3,3" stroke="#333" />
+                                        <XAxis dataKey="name" tick={{ fill: '#666', fontSize: 10, fontWeight: 'bold' }} />
+                                        <YAxis domain={[0, 100]} tick={{ fill: '#666', fontSize: 9 }} />
+                                        <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                                            {[
+                                                { name: 'Potential', value: Math.round(report.talentDna.BP * 100), fill: '#a855f7' },
+                                                { name: 'Velocity', value: Math.round(report.talentDna.LV * 100), fill: '#06b6d4' },
+                                                { name: 'Drive', value: Math.round(report.talentDna.DR * 100), fill: '#f97316' }
+                                            ].map((entry, idx) => (
+                                                <Cell key={`cell-${idx}`} fill={entry.fill} />
+                                            ))}
+                                        </Bar>
+                                    </BarChart>
                                 </ResponsiveContainer>
-                                <div className="absolute bottom-0 left-0 right-0 text-center">
-                                    <span className="text-[8px] text-gray-600 font-bold uppercase">Shadow Area: General Population Mean</span>
-                                </div>
                             </div>
-                            <div className="mt-4 p-3 bg-purple-900/10 border-l border-purple-500 w-full relative z-10">
-                                <p className="text-[8px] text-purple-400 font-bold uppercase leading-relaxed tracking-tighter">
-                                    <Signal size={10} className="inline mr-1" /> Vector Analysis:
-                                    Current learning trajectory suggests an efficiency curve of {Math.round(report.talentDna.LV * 100)}%. System bottleneck identified at {report.talentDna.DR < 0.5 ? 'Drive Threshold' : 'Base Bandwidth'}.
-                                </p>
+                            <div className="mt-6 pt-4 border-t border-gray-800 text-[8px] text-gray-500 space-y-1">
+                                <p><span className="text-purple-400 font-black">Potential:</span> Base talent ceiling</p>
+                                <p><span className="text-cyan-400 font-black">Velocity:</span> Learning speed</p>
+                                <p><span className="text-orange-400 font-black">Drive:</span> Psychological adherence</p>
                             </div>
                         </div>
                     </div>
@@ -355,15 +367,17 @@ export const ClassifiedDossier: React.FC<ClassifiedDossierProps> = ({ report, on
                                 <History size={16} /> [HISTORICAL_PRECEDENT]
                             </h3>
                             <div className="flex items-start gap-4">
-                                <div className="w-16 h-16 bg-cyan-950/50 border border-cyan-800 flex items-center justify-center text-cyan-400 font-orbitron font-black text-2xl shadow-[0_0_15px_rgba(34,211,238,0.2)]">
-                                    {report.historicalPrecedent?.name.charAt(0) || 'Ø'}
+                                <div className="w-16 h-16 bg-cyan-950/50 border-2 border-cyan-600 flex items-center justify-center text-cyan-400 font-orbitron font-black text-2xl shadow-[0_0_15px_rgba(34,211,238,0.3)]">
+                                    {report.historicalPrecedent?.name ? report.historicalPrecedent.name.charAt(0).toUpperCase() : 'X'}
                                 </div>
-                                <div>
-                                    <p className="text-xl font-black font-orbitron text-white uppercase tracking-wider">{report.historicalPrecedent?.name}</p>
-                                    <div className="flex items-center gap-2 text-[10px] text-cyan-400 font-bold mt-1 uppercase tracking-tighter">
-                                        <Signal size={10} /> {report.historicalPrecedent?.matchPercentage || 85}% Alignment
+                                <div className="flex-1">
+                                    <p className="text-lg font-black font-orbitron text-white uppercase tracking-wider leading-tight">
+                                        {report.historicalPrecedent?.name || 'UNIDENTIFIED_ARCHETYPE'}
+                                    </p>
+                                    <div className="flex items-center gap-2 text-[10px] text-cyan-400 font-bold mt-2 uppercase tracking-tighter">
+                                        <Signal size={12} /> CONFIDENCE: {report.historicalPrecedent?.matchPercentage || 0}%
                                     </div>
-                                    <p className="text-[9px] text-gray-500 mt-2 italic leading-tight">"{report.historicalPrecedent?.alignment}"</p>
+                                    <p className="text-[9px] text-gray-400 mt-3 italic leading-tight max-w-xs">"{report.historicalPrecedent?.alignment || 'Profile analysis incomplete'}"</p>
                                 </div>
                             </div>
                         </div>
