@@ -169,11 +169,11 @@ export const ClassifiedDossier: React.FC<ClassifiedDossierProps> = ({ report, on
         <div 
             ref={containerRef}
             onScroll={handleScroll}
-            className="relative w-full h-full flex flex-col bg-[#010101] text-gray-300 font-mono overflow-y-auto vignette transition-all duration-1000"
+            className="relative w-screen h-screen flex flex-col bg-[#010101] text-gray-300 font-mono overflow-y-auto overflow-x-hidden vignette transition-all duration-1000"
         >
-            <div className="bg-film-grain !opacity-15 pointer-events-none z-[100]" />
-            <div className="absolute inset-0 pointer-events-none scanline-overlay z-40" />
-            <div className="grid-background absolute inset-0 pointer-events-none" />
+            <div className="bg-film-grain !opacity-15 pointer-events-none z-[100] fixed inset-0" />
+            <div className="absolute inset-0 pointer-events-none scanline-overlay z-40 fixed" />
+            <div className="grid-background absolute inset-0 pointer-events-none fixed" />
 
             <header className="flex-shrink-0 border-b border-purple-900/30 bg-black/95 p-5 flex justify-between items-center sticky top-0 z-50 backdrop-blur-md">
                 <div className="flex items-center gap-6">
@@ -184,9 +184,10 @@ export const ClassifiedDossier: React.FC<ClassifiedDossierProps> = ({ report, on
                         <h1 className="text-2xl font-black font-orbitron text-gray-100 tracking-[0.2em] uppercase chromatic-aberration">
                             ASSET_FILE: <span className="text-purple-600">GP-0{report.tpi}</span>
                         </h1>
-                        <div className="flex gap-6 mt-2 text-[9px] text-gray-500 font-mono tracking-tighter">
+                        <div className="flex gap-6 mt-2 text-[9px] text-gray-500 font-mono tracking-tighter flex-wrap">
                             <span>OPERATIVE: <span className="text-cyan-400 font-bold">{userName.toUpperCase()}</span></span>
                             <span>CODENAME: <span className="text-purple-400 font-bold">{report.codename.toUpperCase()}</span></span>
+                            {report.biometrics?.dateOfBirth && <span>DOB: <span className="text-amber-400 font-bold">{report.biometrics.dateOfBirth}</span></span>}
                             {report.biometrics?.age && <span>AGE: <span className="text-yellow-500 font-bold">{report.biometrics.age}</span></span>}
                             {report.biometrics?.gender && <span>GENDER: <span className="text-green-400 font-bold">{report.biometrics.gender}</span></span>}
                         </div>
@@ -204,7 +205,7 @@ export const ClassifiedDossier: React.FC<ClassifiedDossierProps> = ({ report, on
                 </div>
             </header>
 
-            <div className="relative z-10 flex flex-col h-full overflow-y-auto custom-scrollbar p-4 md:p-10 max-w-6xl mx-auto w-full space-y-12 pb-32">
+            <div className="relative z-10 flex flex-col w-full overflow-visible custom-scrollbar p-4 md:p-10 max-w-6xl mx-auto space-y-12 pb-32">
                 
                 {/* SECTION 1: HARDWARE & BIOMETRICS */}
                 <section className="space-y-6 animate-in slide-in-from-bottom-8 duration-700">

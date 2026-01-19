@@ -27,6 +27,25 @@ const shuffleArray = <T,>(array: T[]): T[] => {
     return newArr;
 };
 
+// Calculate age from date of birth
+const calculateAge = (dobStr: string | undefined): number | null => {
+    if (!dobStr) return null;
+    try {
+        const parts = dobStr.split('/');
+        if (parts.length !== 3) return null;
+        const dob = new Date(parseInt(parts[2]), parseInt(parts[0]) - 1, parseInt(parts[1]));
+        const today = new Date();
+        let age = today.getFullYear() - dob.getFullYear();
+        const monthDiff = today.getMonth() - dob.getMonth();
+        if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dob.getDate())) {
+            age--;
+        }
+        return age >= 15 && age <= 100 ? age : null;
+    } catch (e) {
+        return null;
+    }
+};
+
 // --- STYLED WRAPPER FOR TERMINAL COMPONENTS ---
 export const TerminalShell: React.FC<{ children: React.ReactNode; title: string; footer?: string; accentClass?: string }> = ({ children, title, footer, accentClass = "border-purple-900/50" }) => (
     <div className={`cyber-terminal w-full h-full sm:max-w-2xl sm:mx-auto rounded-sm border ${accentClass} flex flex-col animate-flicker shadow-[0_0_40px_rgba(0,0,0,0.8)] relative overflow-hidden`}>
@@ -2274,8 +2293,8 @@ export const OnboardingPage: React.FC = () => {
                     talentDna: talentDist.dna,
                     noteworthyFeats: feats,
                     biometrics: {
-                        dateOfBirth: inputs['biometric-data']?.['age'] ? inputs['biometric-data']?.['age'] : undefined,
-                        age: parseInt(inputs['biometric-data']?.['age']) || undefined,
+                        dateOfBirth: inputs['biometric-data']?.['dateOfBirth'],
+                        age: calculateAge(inputs['biometric-data']?.['dateOfBirth']) || 25,
                         gender: inputs['biometric-data']?.['gender'],
                         height: `${inputs['biometric-data']?.['heightFt']}'${inputs['biometric-data']?.['heightIn']}"`,
                         weight: inputs['biometric-data']?.['weight'],

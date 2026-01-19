@@ -82,11 +82,11 @@ export const CALIBRATION_BENCHMARKS: CalibrationBenchmark[] = [
         title: 'Biometric Input',
         questions: [
             { 
-                key: 'age', 
-                prompt: 'Age', 
-                inputType: 'select', 
-                defaultValue: '25',
-                answers: Array.from({length: 85}, (_, i) => ({ text: `${i + 15}` }))
+                key: 'dateOfBirth', 
+                prompt: 'Date of Birth (MM/DD/YYYY)', 
+                inputType: 'text', 
+                defaultValue: '01/15/1995',
+                answers: []
             },
             { key: 'gender', prompt: 'Gender', inputType: 'select', defaultValue: 'Male', answers: [{ text: 'Male' }, { text: 'Female' }, { text: 'Other' }] },
             { 
