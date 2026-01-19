@@ -163,7 +163,7 @@ export const ClassifiedDossier: React.FC<ClassifiedDossierProps> = ({ report, on
             <div className="grid-background absolute inset-0 pointer-events-none" />
 
             <header className="flex-shrink-0 border-b border-purple-900/30 bg-black/95 p-5 flex justify-between items-center sticky top-0 z-50 backdrop-blur-md">
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-6">
                     <div className="flex flex-col">
                         <div className="flex items-center gap-2 text-red-600 text-[10px] font-black tracking-[0.4em] animate-pulse">
                             <ShieldAlert size={14} /> SECURITY_CLEARANCE: LVL_9
@@ -171,6 +171,10 @@ export const ClassifiedDossier: React.FC<ClassifiedDossierProps> = ({ report, on
                         <h1 className="text-2xl font-black font-orbitron text-gray-100 tracking-[0.2em] uppercase chromatic-aberration">
                             ASSET_FILE: <span className="text-purple-600">GP-0{report.tpi}</span>
                         </h1>
+                        <div className="flex gap-6 mt-2 text-[9px] text-gray-500 font-mono tracking-tighter">
+                            <span>OPERATIVE: <span className="text-cyan-400 font-bold">{userName.toUpperCase()}</span></span>
+                            <span>CODENAME: <span className="text-purple-400 font-bold">{report.codename.toUpperCase()}</span></span>
+                        </div>
                     </div>
                 </div>
                 <div className="text-right flex items-center gap-6">
@@ -268,7 +272,7 @@ export const ClassifiedDossier: React.FC<ClassifiedDossierProps> = ({ report, on
                 </section>
 
                 {/* SECTION 2: NEURAL ARCHITECTURE & COMPARATIVE MAPPING */}
-                <section className={`space-y-6 transition-all duration-1000 ${clearance >= 1 ? 'opacity-100 scale-100' : 'opacity-20 scale-95 blur-sm grayscale'}`}>
+                <section className="space-y-6 animate-in slide-in-from-bottom-8 duration-700 delay-200">
                     <div className="flex items-center gap-4 border-l-4 border-cyan-600 pl-4">
                         <span className="bg-cyan-600 text-black px-2 py-0.5 text-[10px] font-black font-orbitron">TIER_02</span>
                         <h2 className="text-xl font-black font-orbitron text-white tracking-widest uppercase">Neural architecture mapping</h2>
@@ -321,7 +325,7 @@ export const ClassifiedDossier: React.FC<ClassifiedDossierProps> = ({ report, on
                 </section>
 
                 {/* SECTION 3: SYSTEM WARNINGS & STRATEGIC INSIGHT */}
-                <section className={`space-y-8 transition-all duration-1000 ${clearance >= 2 ? 'opacity-100' : 'opacity-10 blur-md pointer-events-none'}`}>
+                <section className="space-y-8 animate-in slide-in-from-bottom-8 duration-700 delay-300">
                     <div className="flex items-center gap-4 border-l-4 border-red-600 pl-4">
                         <span className="bg-red-600 text-white px-2 py-0.5 text-[10px] font-black font-orbitron">TIER_03</span>
                         <h2 className="text-xl font-black font-orbitron text-white tracking-widest uppercase">Neural Friction & Critical Failures</h2>
@@ -378,15 +382,189 @@ export const ClassifiedDossier: React.FC<ClassifiedDossierProps> = ({ report, on
                     </div>
                 </section>
 
+                {/* SECTION 4: GROWTH VECTORS & POTENTIAL */}
+                <section className="space-y-6 animate-in slide-in-from-bottom-8 duration-700 delay-400">
+                    <div className="flex items-center gap-4 border-l-4 border-indigo-600 pl-4">
+                        <span className="bg-indigo-600 text-black px-2 py-0.5 text-[10px] font-black font-orbitron">TIER_04</span>
+                        <h2 className="text-xl font-black font-orbitron text-white tracking-widest uppercase">Growth Vectors & Potential Ceiling</h2>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div className="bg-black/50 border border-indigo-900/50 p-6 relative overflow-hidden group hover:border-indigo-500/70 transition-colors">
+                            <div className="absolute inset-0 bg-film-grain !opacity-[0.03]" />
+                            <h3 className="text-indigo-400 font-black text-[10px] tracking-[0.3em] uppercase mb-4 flex items-center gap-2">
+                                <TrendingUp size={14} /> Talent Class Vector
+                            </h3>
+                            <div className="relative z-10">
+                                <p className="text-3xl font-black font-orbitron text-indigo-300 mb-2">{report.talentClass}</p>
+                                <div className="bg-indigo-950/40 p-3 border border-indigo-800/40 rounded-sm text-[9px] text-indigo-300 font-mono space-y-1">
+                                    <p><span className="text-indigo-500 font-black">XP Multiplier:</span> {report.talentDna.LV >= 0.9 ? '2.0x' : report.talentDna.LV >= 0.75 ? '1.6x' : report.talentDna.LV >= 0.6 ? '1.3x' : '1.0x'}</p>
+                                    <p><span className="text-indigo-500 font-black">Percentile:</span> {Math.round(report.talentDna.LV * 100)}th</p>
+                                    <p><span className="text-indigo-500 font-black">Status:</span> IMMUTABLE (until promotion)</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="bg-black/50 border border-amber-900/50 p-6 relative overflow-hidden group hover:border-amber-500/70 transition-colors">
+                            <div className="absolute inset-0 bg-film-grain !opacity-[0.03]" />
+                            <h3 className="text-amber-400 font-black text-[10px] tracking-[0.3em] uppercase mb-4 flex items-center gap-2">
+                                <Zap size={14} /> Obsession Level Vector
+                            </h3>
+                            <div className="relative z-10">
+                                <p className="text-3xl font-black font-orbitron text-amber-300 mb-2">{report.obsessionLevel}</p>
+                                <div className="bg-amber-950/40 p-3 border border-amber-800/40 rounded-sm text-[9px] text-amber-300 font-mono space-y-1">
+                                    <p><span className="text-amber-500 font-black">Adherence:</span> {report.successProbability}%</p>
+                                    <p><span className="text-amber-500 font-black">Percentile:</span> {Math.round(report.talentDna.DR * 100)}th</p>
+                                    <p><span className="text-amber-500 font-black">Status:</span> MUTABLE (with practice)</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="bg-black/50 border border-cyan-900/50 p-6 relative overflow-hidden group hover:border-cyan-500/70 transition-colors">
+                            <div className="absolute inset-0 bg-film-grain !opacity-[0.03]" />
+                            <h3 className="text-cyan-400 font-black text-[10px] tracking-[0.3em] uppercase mb-4 flex items-center gap-2">
+                                <Target size={14} /> Potential Ceiling
+                            </h3>
+                            <div className="relative z-10">
+                                <p className="text-2xl font-black font-orbitron text-cyan-300 mb-2">
+                                    {report.talentClass === 'Genius' && report.obsessionLevel === 'Compulsive' ? 'SINGULARITY' : report.talentClass === 'Genius' ? 'S+/SS' : report.obsessionLevel === 'Compulsive' ? 'S' : 'A-B'}
+                                </p>
+                                <div className="bg-cyan-950/40 p-3 border border-cyan-800/40 rounded-sm text-[9px] text-cyan-300 font-mono space-y-1">
+                                    <p><span className="text-cyan-500 font-black">Trajectory:</span> {report.talentDna.DR > 0.7 ? 'Exponential' : 'Linear'}</p>
+                                    <p><span className="text-cyan-500 font-black">Timeline:</span> {report.talentDna.DR > 0.8 ? '3-6 weeks' : '3-6 months'}</p>
+                                    <p><span className="text-cyan-500 font-black">Burnout:</span> {report.obsessionLevel === 'Compulsive' ? 'Negligible' : report.obsessionLevel === 'Locked-In' ? 'Low' : 'High'}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="bg-indigo-950/20 border border-indigo-900/40 p-6 rounded-sm relative overflow-hidden">
+                        <div className="absolute inset-0 bg-film-grain !opacity-[0.02]" />
+                        <p className="text-[10px] text-indigo-300 font-mono leading-relaxed relative z-10">
+                            <span className="text-indigo-500 font-black">ANALYSIS:</span> Your talent class defines learning velocity; your obsession level determines consistency. The combination dictates your theoretical maximum. {report.talentClass === 'Genius' && report.obsessionLevel === 'Compulsive' && 'Singularity-tier asset—exponential ceiling detected.'} {report.obsessionLevel === 'Compulsive' && report.talentClass !== 'Genius' && 'Effort-driven asset—will eventually exceed naturally talented peers.'} {report.talentClass === 'Genius' && report.obsessionLevel !== 'Compulsive' && 'Natural talent without discipline—will hit ceiling without external accountability.'}
+                        </p>
+                    </div>
+                </section>
+
+                {/* SECTION 5: SIGNATURE ACHIEVEMENTS & RARE FEATS */}
+                <section className="space-y-6 animate-in slide-in-from-bottom-8 duration-700 delay-500">
+                    <div className="flex items-center gap-4 border-l-4 border-yellow-600 pl-4">
+                        <span className="bg-yellow-600 text-black px-2 py-0.5 text-[10px] font-black font-orbitron">TIER_05</span>
+                        <h2 className="text-xl font-black font-orbitron text-white tracking-widest uppercase">Signature Achievements & Rare Markers</h2>
+                    </div>
+
+                    {report.noteworthyFeats && report.noteworthyFeats.length > 0 ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {report.noteworthyFeats.map((feat, i) => (
+                                <div key={i} className={`bg-black/60 border p-6 relative overflow-hidden group hover:scale-105 transition-all ${feat.rarity === 'Mythic' ? 'border-amber-600/60 hover:border-amber-400' : 'border-purple-600/60 hover:border-purple-400'}`}>
+                                    <div className="absolute inset-0 bg-film-grain !opacity-[0.04]" />
+                                    <div className="absolute -top-6 -right-6 opacity-5 group-hover:opacity-15 transition-opacity">
+                                        {feat.rarity === 'Mythic' ? <Award size={80} className="text-amber-500" /> : <Shield size={80} className="text-purple-500" />}
+                                    </div>
+                                    <div className="relative z-10">
+                                        <div className={`inline-block px-3 py-1 rounded-sm text-[8px] font-black tracking-widest uppercase mb-4 ${feat.rarity === 'Mythic' ? 'bg-amber-900/40 text-amber-400 border border-amber-600/40' : 'bg-purple-900/40 text-purple-400 border border-purple-600/40'}`}>
+                                            {feat.rarity} ACHIEVEMENT
+                                        </div>
+                                        <p className="text-lg font-black font-orbitron text-white uppercase tracking-wider mb-2">{feat.label}</p>
+                                        <p className={`text-sm font-black font-orbitron mb-3 ${feat.rarity === 'Mythic' ? 'text-amber-300' : 'text-purple-300'}`}>{feat.value}</p>
+                                        <p className="text-[9px] text-gray-400 leading-relaxed italic">{feat.desc}</p>
+                                        <div className="mt-3 pt-3 border-t border-gray-800">
+                                            <p className="text-[8px] text-gray-600 font-mono uppercase tracking-tighter">Impact: Permanently recorded on asset profile</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="bg-black/50 border border-gray-800 p-8 text-center rounded-sm">
+                            <div className="text-gray-600 mb-3"><Award size={32} className="mx-auto opacity-30" /></div>
+                            <p className="text-[11px] text-gray-500 font-mono uppercase tracking-widest">No mythic achievements detected in this session.</p>
+                            <p className="text-[9px] text-gray-600 italic mt-2">Signature feats are recorded when performance exceeds 95th percentile thresholds.</p>
+                        </div>
+                    )}
+                </section>
+
+                {/* SECTION 6: FINAL CLASSIFICATION & OPERATIONAL DIRECTIVE */}
+                <section className="space-y-6 animate-in slide-in-from-bottom-8 duration-700 delay-600">
+                    <div className="flex items-center gap-4 border-l-4 border-white pl-4">
+                        <span className="bg-white text-black px-2 py-0.5 text-[10px] font-black font-orbitron">TIER_06</span>
+                        <h2 className="text-xl font-black font-orbitron text-white tracking-widest uppercase">Operational Classification & Final Directive</h2>
+                    </div>
+
+                    <div className="bg-gradient-to-r from-purple-950/40 via-black to-cyan-950/40 border border-purple-800/60 p-10 relative overflow-hidden rounded-sm shadow-2xl">
+                        <div className="absolute inset-0 bg-film-grain !opacity-[0.08]" />
+                        <div className="absolute -top-20 -left-20 w-96 h-96 bg-purple-600/5 rounded-full blur-3xl pointer-events-none" />
+                        <div className="absolute -bottom-20 -right-20 w-96 h-96 bg-cyan-600/5 rounded-full blur-3xl pointer-events-none" />
+                        
+                        <div className="relative z-10 space-y-8">
+                            <div>
+                                <h3 className="text-purple-400 font-black text-[11px] tracking-[0.5em] uppercase mb-4 flex items-center gap-3">
+                                    <ShieldCheck size={18} /> Classification Summary
+                                </h3>
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+                                    <div className="bg-black/60 border border-purple-800/40 p-4 rounded-sm">
+                                        <p className="text-[10px] text-gray-500 font-mono mb-1">ASSET_CLASS</p>
+                                        <p className="text-2xl font-black font-orbitron text-purple-300">{report.overallRank}</p>
+                                    </div>
+                                    <div className="bg-black/60 border border-indigo-800/40 p-4 rounded-sm">
+                                        <p className="text-[10px] text-gray-500 font-mono mb-1">TALENT_DNA</p>
+                                        <p className="text-2xl font-black font-orbitron text-indigo-300">{report.talentClass.split(' ')[0]}</p>
+                                    </div>
+                                    <div className="bg-black/60 border border-amber-800/40 p-4 rounded-sm">
+                                        <p className="text-[10px] text-gray-500 font-mono mb-1">OBSESSION_LVL</p>
+                                        <p className="text-2xl font-black font-orbitron text-amber-300">{report.obsessionLevel.split(' ')[0]}</p>
+                                    </div>
+                                    <div className="bg-black/60 border border-cyan-800/40 p-4 rounded-sm">
+                                        <p className="text-[10px] text-gray-500 font-mono mb-1">RARITY_IDX</p>
+                                        <p className="text-xl font-black font-orbitron text-cyan-300">{report.rarity}</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="border-t border-purple-800/20 pt-8">
+                                <h3 className="text-cyan-400 font-black text-[11px] tracking-[0.5em] uppercase mb-4 flex items-center gap-3">
+                                    <Database size={18} /> Operational Directive
+                                </h3>
+                                <div className="bg-black/60 border border-cyan-900/40 p-6 rounded-sm text-[10px] text-gray-300 font-mono leading-relaxed space-y-3">
+                                    <p><span className="text-cyan-500 font-black">DEPLOYMENT_RECOMMENDATION:</span> {report.obsessionLevel === 'Compulsive' ? 'Fast-track to advanced protocols—minimal failure risk.' : report.obsessionLevel === 'Relentless' ? 'Suitable for marathon-style long-term objectives.' : report.obsessionLevel === 'Locked-In' ? 'Recommend structured milestones with external accountability.' : 'High early-dropout probability—implement reward loops and weekly visibility.'}</p>
+                                    <p><span className="text-cyan-500 font-black">BURNOUT_RISK:</span> {report.obsessionLevel === 'Compulsive' || report.obsessionLevel === 'Relentless' ? 'Negligible to Low' : report.obsessionLevel === 'Locked-In' ? 'Low' : 'High'}</p>
+                                    <p><span className="text-cyan-500 font-black">OPTIMAL_PACE:</span> {report.talentClass === 'Genius' ? 'Exponential acceleration—asset handles high complexity bursts.' : report.talentClass === 'Gifted' ? 'Moderate-to-aggressive progression.' : report.talentClass === 'Talented Learner' ? 'Structured progression with specialization focus.' : 'Linear progression with reinforcement cycles.'}</p>
+                                </div>
+                            </div>
+
+                            <div className="border-t border-purple-800/20 pt-8">
+                                <h3 className="text-white font-black text-[11px] tracking-[0.5em] uppercase mb-4 flex items-center gap-3">
+                                    <Lock size={18} /> Immutable Profile Elements
+                                </h3>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-[9px]">
+                                    <div className="bg-black/60 border border-gray-800 p-3 rounded-sm flex items-center gap-2">
+                                        <Lock size={12} className="text-gray-600" />
+                                        <span className="text-gray-400"><span className="text-gray-300 font-black">Talent Class</span> — Locked until promotion</span>
+                                    </div>
+                                    <div className="bg-black/60 border border-gray-800 p-3 rounded-sm flex items-center gap-2">
+                                        <Lock size={12} className="text-gray-600" />
+                                        <span className="text-gray-400"><span className="text-gray-300 font-black">HATI %</span> — Percentile frozen</span>
+                                    </div>
+                                    <div className="bg-black/60 border border-gray-800 p-3 rounded-sm flex items-center gap-2">
+                                        <Lock size={12} className="text-gray-600" />
+                                        <span className="text-gray-400"><span className="text-gray-300 font-black">Biometrics</span> — Static hardware</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
                 {/* FINAL CALL TO ACTION */}
-                <div className={`transition-all duration-1000 text-center space-y-6 pt-10 ${clearance >= 3 ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
+                <div className="transition-all duration-1000 text-center space-y-6 pt-10 pb-20 animate-in slide-in-from-bottom-8 duration-700 delay-700">
                     <div className="flex flex-col items-center gap-2">
                         <div className="flex gap-4">
                             <Binary className="text-purple-900" size={24} />
                             <ShieldCheck className="text-purple-500 animate-bounce" size={24} />
                             <Binary className="text-purple-900" size={24} />
                         </div>
-                        <p className="text-[10px] text-gray-600 font-black uppercase tracking-[1em] mb-4">Awaiting_Final_Asset_Confirmation</p>
+                        <p className="text-[10px] text-gray-600 font-black uppercase tracking-[1em] mb-4">Dossier_Classification_Complete</p>
+                        <p className="text-[9px] text-gray-700 font-mono italic">All tiers unlocked. Asset profile fully calibrated and ready for deployment.</p>
                     </div>
                     
                     {onProceed && (
