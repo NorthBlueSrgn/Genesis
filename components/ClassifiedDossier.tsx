@@ -169,7 +169,7 @@ export const ClassifiedDossier: React.FC<ClassifiedDossierProps> = ({ report, on
         <div 
             ref={containerRef}
             onScroll={handleScroll}
-            className="relative w-full h-full flex flex-col bg-[#010101] text-gray-300 font-mono overflow-hidden vignette transition-all duration-1000"
+            className="relative w-full h-full flex flex-col bg-[#010101] text-gray-300 font-mono overflow-y-auto vignette transition-all duration-1000"
         >
             <div className="bg-film-grain !opacity-15 pointer-events-none z-[100]" />
             <div className="absolute inset-0 pointer-events-none scanline-overlay z-40" />
@@ -187,6 +187,8 @@ export const ClassifiedDossier: React.FC<ClassifiedDossierProps> = ({ report, on
                         <div className="flex gap-6 mt-2 text-[9px] text-gray-500 font-mono tracking-tighter">
                             <span>OPERATIVE: <span className="text-cyan-400 font-bold">{userName.toUpperCase()}</span></span>
                             <span>CODENAME: <span className="text-purple-400 font-bold">{report.codename.toUpperCase()}</span></span>
+                            {report.biometrics?.age && <span>AGE: <span className="text-yellow-500 font-bold">{report.biometrics.age}</span></span>}
+                            {report.biometrics?.gender && <span>GENDER: <span className="text-green-400 font-bold">{report.biometrics.gender}</span></span>}
                         </div>
                     </div>
                 </div>

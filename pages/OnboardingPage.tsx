@@ -3,7 +3,7 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useGameState } from '../contexts/GameStateContext';
 import { Stat, StatName, SubStatName, AttributeRankName, TraitScores, FullCalibrationReport, TalentDna, TalentClass, ObsessionLevel, ResonanceVector, SubStat, ResonanceType, CalibrationBenchmark } from '../types';
 import { INITIAL_STATS, STAT_SUBSTAT_MAP, getRankForMainStatValue, getRankForSubstatValue, RANKS } from '../constants';
-import { generateFullCalibrationReport, evaluateCreativityAnswers, evaluatePsychometricData, evaluateEquilibriumPerformance, generateAdaptiveQuestion, generateWarRoomScenario, evaluateKnowledgeAnswer } from '../services/geminiService';
+import { generateFullCalibrationReport, evaluateCreativityAnswers, evaluatePsychometricData, evaluateEquilibriumPerformance, generateAdaptiveQuestion, generateWarRoomScenario, evaluateKnowledgeAnswer, generateSpecializedReasoningQuestion, generateKnowledgeDomainChallenge, generateStrategicScenario, evaluateStrategyDecision } from '../services/geminiService';
 import Loader from '../components/ui/Loader';
 import Card from '../components/ui/Card';
 import { CALIBRATION_BENCHMARKS, HOBBY_LIST } from '../data/calibrationData';
@@ -1247,28 +1247,59 @@ const AdaptiveKnowledgeTest: React.FC<{ onComplete: (data: any) => void }> = ({ 
     const inputRef = useRef<HTMLInputElement>(null);
     const TOTAL_ROUNDS = 10;
 
-    const fetchNext = (currDiff: number, currHist: any[]) => {
+    const fetchNext = async (currDiff: number, currHist: any[]) => {
         setLoading(true);
         const usedQuestions = currHist.map(h => h.q);
+        const usedDomains = currHist.map(h => h.domain);
         
-        // FIXED: Actually randomize difficulty search to prevent same questions
-        const targetDifficulty = currDiff + (Math.random() * 20 - 10); // Add randomness ±10%
-        
-        // Try multiple times to get a different question
-        let q = null;
-        for (let attempt = 0; attempt < 5; attempt++) {
-            const attemptDiff = Math.max(10, Math.min(90, targetDifficulty + (Math.random() * 30 - 15)));
-            q = getAdaptiveQuestionV2(attemptDiff, usedQuestions);
-            if (q && !usedQuestions.includes(q.questionText)) {
-                break;
+        try {
+            // 70% chance to use AI-generated, 30% to use pre-built for consistency
+            const useAI = Math.random() < 0.7;
+            
+            if (useAI) {
+                // Try AI generation first
+                const aiQuestion = await generateKnowledgeDomainChallenge(currDiff, usedDomains);
+                if (aiQuestion?.question && aiQuestion?.answer) {
+                    setCurrentQ({
+                        questionText: aiQuestion.question,
+                        acceptedAnswers: [aiQuestion.answer, ...(aiQuestion.alternatives || [])],
+                        domain: aiQuestion.domain,
+                        difficulty: currDiff
+                    });
+                    setCorrectAnswer(aiQuestion.answer);
+                    setLoading(false);
+                    setUserAnswer('');
+                    setTimeout(() => inputRef.current?.focus(), 100);
+                    return;
+                }
             }
-        }
-        
-        if (q) {
-            setCurrentQ(q);
-            setCorrectAnswer(q.acceptedAnswers[0]);
-        } else {
-            // Fallback question
+            
+            // Fallback to static question bank
+            const targetDifficulty = currDiff + (Math.random() * 20 - 10);
+            let q = null;
+            for (let attempt = 0; attempt < 5; attempt++) {
+                const attemptDiff = Math.max(10, Math.min(90, targetDifficulty + (Math.random() * 30 - 15)));
+                q = getAdaptiveQuestionV2(attemptDiff, usedQuestions);
+                if (q && !usedQuestions.includes(q.questionText)) {
+                    break;
+                }
+            }
+            
+            if (q) {
+                setCurrentQ(q);
+                setCorrectAnswer(q.acceptedAnswers[0]);
+            } else {
+                setCurrentQ({
+                    questionText: "What is the capital of France?",
+                    acceptedAnswers: ["Paris"],
+                    domain: "Geography",
+                    difficulty: 85
+                });
+                setCorrectAnswer("Paris");
+            }
+        } catch (e) {
+            console.error('Error fetching next question:', e);
+            // Fallback
             setCurrentQ({
                 questionText: "What is the capital of France?",
                 acceptedAnswers: ["Paris"],
@@ -1276,22 +1307,19 @@ const AdaptiveKnowledgeTest: React.FC<{ onComplete: (data: any) => void }> = ({ 
                 difficulty: 85
             });
             setCorrectAnswer("Paris");
+        } finally {
+            setLoading(false);
+            setUserAnswer('');
+            setTimeout(() => inputRef.current?.focus(), 100);
         }
-        setLoading(false);
-        setUserAnswer('');
-        
-        // Focus input after a short delay
-        setTimeout(() => {
-            inputRef.current?.focus();
-        }, 100);
     };
 
-    const handleStart = () => { 
+    const handleStart = async () => { 
         setPhase('active'); 
-        fetchNext(difficulty, history); 
+        await fetchNext(difficulty, history); 
     };
 
-    const handleSubmit = (e?: React.FormEvent) => {
+    const handleSubmit = async (e?: React.FormEvent) => {
         e?.preventDefault();
         if (!userAnswer.trim() || !currentQ || phase === 'feedback') return;
         
@@ -1304,7 +1332,8 @@ const AdaptiveKnowledgeTest: React.FC<{ onComplete: (data: any) => void }> = ({ 
             a: userAnswer, 
             correctAnswer: currentQ.acceptedAnswers[0],
             correct: isCorrect, 
-            diff: difficulty 
+            diff: difficulty,
+            domain: currentQ.domain
         }];
         setHistory(newHistory);
         
@@ -1315,7 +1344,7 @@ const AdaptiveKnowledgeTest: React.FC<{ onComplete: (data: any) => void }> = ({ 
             ? Math.max(5, difficulty - step)  // Correct = DECREASE % = harder next
             : Math.min(95, difficulty + step); // Wrong = INCREASE % = easier next
         
-        setTimeout(() => {
+        setTimeout(async () => {
             if (round >= TOTAL_ROUNDS) {
                 // Final score: difficulty represents percentile of population answering correctly
                 // User settles at difficulty=50 means 50% of people answer correctly = score 50
@@ -1327,7 +1356,7 @@ const AdaptiveKnowledgeTest: React.FC<{ onComplete: (data: any) => void }> = ({ 
                 setDifficulty(nextDiff);
                 setRound(r => r + 1);
                 setPhase('active');
-                fetchNext(nextDiff, newHistory);
+                await fetchNext(nextDiff, newHistory);
             }
         }, 2000);
     };
@@ -2243,7 +2272,17 @@ export const OnboardingPage: React.FC = () => {
                     initialStatsSnapshot: stats,
                     estimatedCeilingRank: calculateCeilingRank(mapScoreToRank(scores.apexThreatIndex), traitResult.talentClass),
                     talentDna: talentDist.dna,
-                    noteworthyFeats: feats
+                    noteworthyFeats: feats,
+                    biometrics: {
+                        dateOfBirth: inputs['biometric-data']?.['age'] ? inputs['biometric-data']?.['age'] : undefined,
+                        age: parseInt(inputs['biometric-data']?.['age']) || undefined,
+                        gender: inputs['biometric-data']?.['gender'],
+                        height: `${inputs['biometric-data']?.['heightFt']}'${inputs['biometric-data']?.['heightIn']}"`,
+                        weight: inputs['biometric-data']?.['weight'],
+                        benchPress: inputs['physical-performance']?.['benchPress'],
+                        breathHold: inputs['breath-hold-test']?.['vitality-breath-hold'],
+                        cnsReactionSpeed: inputs['fitts-law-test']?.['avgReactionTime']
+                    }
                 } as FullCalibrationReport;
                 setReport(finalReport);
                 console.log('✓ Final report set successfully');

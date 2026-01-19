@@ -1,4 +1,3 @@
-
 // services/geminiService.ts
 import { GoogleGenAI, Chat } from "@google/genai";
 import { GameState, Rank, Stat, ChatMessage, Mission, PromotionExam, LoreEntry, StatName, Path, Task, SubStatName, TaskType, IconName, AttributeRankName, ResonanceSignature, ResonanceType, CodexEntry, SideMission, SideMissionStage, SideMissionObjective, PlannedTask, FullCalibrationReport, TalentDna, TraitAnalysisResult, TaskReport, EvaluationResult, NutritionAnalysis, DailyMetrics } from '../types';
@@ -295,4 +294,161 @@ export const analyzeNutrition = async (input: string, currentMetrics?: DailyMetr
         const response = await ai.models.generateContent({ model: MODEL_NAME, contents: prompt, config: { responseMimeType: "application/json" } });
         return getCleanJson(response.text || "{}");
     } catch (e) { return { isClean: true, explanation: "Fallback fuel estimation.", estimatedMacros: { calories: 500, protein: 30, carbs: 40, fats: 15 } }; }
+};
+
+export const generateSpecializedReasoningQuestion = async (difficulty: number, domain?: string): Promise<{ text: string; options: string[]; correct: number; domain: string; explanation: string }> => {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const populationPercentile = 100 - difficulty; // e.g., difficulty 20 = 80th percentile
+    const selectedDomain = domain || ['Logic', 'Math', 'Analogy', 'Probability', 'Pattern Recognition', 'Deduction'][Math.floor(Math.random() * 6)];
+    
+    const systemPrompt = `You are a rigorous reasoning test generator. Create challenging, elegant questions that assess critical thinking.
+    CRITICAL: Return VALID JSON only, no markdown. Never wrap in triple backticks.
+    Difficulty ${populationPercentile}% means ${populationPercentile}% of test-takers answer correctly.
+    Return: {"text": "...", "options": ["A", "B", "C", "D"], "correct": 0, "domain": "...", "explanation": "..."}`;
+    
+    const prompt = `Generate a ${selectedDomain} reasoning question for the ${populationPercentile}th percentile (${populationPercentile}% can solve).
+    Make it intellectually rigorous and elegant. Ensure exactly 4 options.`;
+    
+    try {
+        const response = await ai.models.generateContent({
+            model: MODEL_NAME,
+            contents: prompt,
+            config: { systemInstruction: systemPrompt, responseMimeType: 'application/json' }
+        });
+        const result = getCleanJson(response.text || '{}');
+        
+        // Validate result
+        if (result.text && Array.isArray(result.options) && result.options.length === 4 && typeof result.correct === 'number') {
+            return result;
+        }
+        return { text: "Fallback: Solve 2x + 3 = 11", options: ["2", "4", "6", "8"], correct: 2, domain: "Math", explanation: "Basic algebra: x = 4" };
+    } catch (e) {
+        console.error('generateSpecializedReasoningQuestion error:', e);
+        return { text: "Fallback: Solve 2x + 3 = 11", options: ["2", "4", "6", "8"], correct: 2, domain: "Math", explanation: "Basic algebra: x = 4" };
+    }
+};
+
+export const generateKnowledgeDomainChallenge = async (difficulty: number, previousDomains: string[] = []): Promise<{ question: string; domain: string; answer: string; alternatives: string[]; explanation: string }> => {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const populationPercentile = 100 - difficulty;
+    const excludedDomains = previousDomains.length > 0 ? `Avoid: ${previousDomains.join(', ')}` : '';
+    
+    const systemPrompt = `You are a knowledge assessment generator. Create substantive, fact-based questions across diverse domains.
+    CRITICAL: Return VALID JSON only, no markdown. Never wrap in triple backticks.
+    Return: {"question": "...", "domain": "...", "answer": "...", "alternatives": ["alt1", "alt2"], "explanation": "..."}`;
+    
+    const prompt = `Generate a knowledge question for ${populationPercentile}th percentile difficulty. ${excludedDomains}
+    Domains: Science, History, Philosophy, Literature, Art, Geography, Economics, Technology, Psychology, Culture.
+    Make it substantive and intellectually stimulating.`;
+    
+    try {
+        const response = await ai.models.generateContent({
+            model: MODEL_NAME,
+            contents: prompt,
+            config: { systemInstruction: systemPrompt, responseMimeType: 'application/json' }
+        });
+        const result = getCleanJson(response.text || '{}');
+        if (result.question && result.answer && result.domain) {
+            return result;
+        }
+        return { question: "What is the scientific name for the Great White Shark?", domain: "Biology", answer: "Carcharodon carcharias", alternatives: ["Squalus carcharias", "Lamna nasus"], explanation: "Established binomial nomenclature." };
+    } catch (e) {
+        console.error('generateKnowledgeDomainChallenge error:', e);
+        return { question: "What is the scientific name for the Great White Shark?", domain: "Biology", answer: "Carcharodon carcharias", alternatives: ["Squalus carcharias", "Lamna nasus"], explanation: "Established binomial nomenclature." };
+    }
+};
+
+export const generateStrategicScenario = async (round: number, previousActions: any[] = [], difficulty: 'medium' | 'hard' = 'medium'): Promise<{ scenario: string; context: string; options: { opt_1: { text: string; impact: string }; opt_2: { text: string; impact: string }; opt_3: { text: string; impact: string } }; consequenceIfSelected: string }> => {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    
+    const historyContext = previousActions.length > 0 
+        ? `Previous actions: ${previousActions.map((a, i) => `Round ${i + 1}: ${a}`).join(', ')}` 
+        : 'First scenario.';
+    
+    const systemPrompt = `You are a strategic scenario generator. Create complex, realistic dilemmas that test decision-making under pressure.
+    CRITICAL: Return VALID JSON only. Never wrap output in markdown or backticks.
+    Return: {"scenario": "...", "context": "...", "options": {"opt_1": {"text": "...", "impact": "..."}, "opt_2": {...}, "opt_3": {...}}, "consequenceIfSelected": "..."}`;
+    
+    const prompt = `Round ${round} scenario (${difficulty} difficulty). ${historyContext}
+    Create a realistic strategic situation requiring trade-off analysis. Make it thought-provoking.
+    Ensure each option has real consequences.`;
+    
+    try {
+        const response = await ai.models.generateContent({
+            model: MODEL_NAME,
+            contents: prompt,
+            config: { systemInstruction: systemPrompt, responseMimeType: 'application/json' }
+        });
+        const result = getCleanJson(response.text || '{}');
+        if (result.scenario && result.options && result.options.opt_1) {
+            return result;
+        }
+        // Fallback
+        return {
+            scenario: "Your team faces resource constraints with competing operational priorities.",
+            context: "Limited budget for the quarter; critical infrastructure vs. personnel development.",
+            options: {
+                opt_1: { text: "Prioritize infrastructure upgrade", impact: "Operational efficiency +15%, morale -10%" },
+                opt_2: { text: "Invest in staff training", impact: "Long-term capability +20%, immediate risk +5%" },
+                opt_3: { text: "Allocate equally", impact: "Balanced risk, efficiency +8%, capability +10%" }
+            },
+            consequenceIfSelected: "Consequences will shape your team's resilience."
+        };
+    } catch (e) {
+        console.error('generateStrategicScenario error:', e);
+        return {
+            scenario: "Your team faces resource constraints with competing operational priorities.",
+            context: "Limited budget for the quarter; critical infrastructure vs. personnel development.",
+            options: {
+                opt_1: { text: "Prioritize infrastructure upgrade", impact: "Operational efficiency +15%, morale -10%" },
+                opt_2: { text: "Invest in staff training", impact: "Long-term capability +20%, immediate risk +5%" },
+                opt_3: { text: "Allocate equally", impact: "Balanced risk, efficiency +8%, capability +10%" }
+            },
+            consequenceIfSelected: "Consequences will shape your team's resilience."
+        };
+    }
+};
+
+export const evaluateReasoningQuality = async (question: string, userAnswer: string, correctAnswer: string): Promise<{ correct: boolean; score: number; feedback: string }> => {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    
+    const systemPrompt = `You are a test evaluator. Assess reasoning quality.
+    Return: {"correct": boolean, "score": 0-100, "feedback": "..."}`;
+    
+    const prompt = `Question: "${question}" | User Answer: "${userAnswer}" | Correct: "${correctAnswer}"
+    Is the user answer correct or logically equivalent? Provide feedback.`;
+    
+    try {
+        const response = await ai.models.generateContent({
+            model: MODEL_NAME,
+            contents: prompt,
+            config: { systemInstruction: systemPrompt, responseMimeType: 'application/json' }
+        });
+        const result = getCleanJson(response.text || '{}');
+        return result.correct !== undefined ? result : { correct: false, score: 0, feedback: "Unable to evaluate." };
+    } catch (e) {
+        return { correct: false, score: 0, feedback: "Evaluation service unavailable." };
+    }
+};
+
+export const evaluateStrategyDecision = async (scenario: string, decision: string, context: string): Promise<{ score: number; reasoning: string; strengths: string[]; weaknesses: string[] }> => {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    
+    const systemPrompt = `You are a strategic analyst. Evaluate decisions on quality, foresight, and risk management.
+    Return: {"score": 0-100, "reasoning": "...", "strengths": [...], "weaknesses": [...]}`;
+    
+    const prompt = `Scenario: "${scenario}" | Decision: "${decision}" | Context: "${context}"
+    Rate the strategic merit of this decision. Consider short/long-term impacts, risk, and alternatives.`;
+    
+    try {
+        const response = await ai.models.generateContent({
+            model: MODEL_NAME,
+            contents: prompt,
+            config: { systemInstruction: systemPrompt, responseMimeType: 'application/json' }
+        });
+        const result = getCleanJson(response.text || '{}');
+        return result.score !== undefined ? result : { score: 50, reasoning: "Assessment unavailable.", strengths: [], weaknesses: [] };
+    } catch (e) {
+        return { score: 50, reasoning: "Assessment unavailable.", strengths: [], weaknesses: [] };
+    }
 };

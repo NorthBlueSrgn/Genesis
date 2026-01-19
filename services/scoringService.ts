@@ -284,6 +284,17 @@ export const getPercentileForSubstat = (subStatName: SubStatName, inputs: any, c
  * with proper averaging, inflation prevention, and weighting
  */
 export const calculateSubstatsFromAllTests = (inputs: any): Record<SubStatName, number> => {
+    // Count completed tests - if too many are skipped, apply penalty multiplier
+    const testsCompleted = Object.keys(inputs).filter(key => inputs[key] && Object.keys(inputs[key]).length > 0).length;
+    const totalTests = 17; // Total calibration steps
+    const completionRatio = testsCompleted / totalTests;
+    
+    // Penalty: if user skips most tests, reduce all scores
+    // Full skip (0 tests) = 20-30 percentile reduction
+    // Half skip (8-9 tests) = 5-10 percentile reduction
+    // Most complete (14+ tests) = 0 reduction
+    const skipPenalty = Math.max(0, 30 - (completionRatio * 35));
+    
     const substats: Record<SubStatName, number> = {
         [SubStatName.Strength]: 50,
         [SubStatName.Speed]: 50,
@@ -320,9 +331,9 @@ export const calculateSubstatsFromAllTests = (inputs: any): Record<SubStatName, 
     // Helper: Average multiple percentiles, cap at 95 to prevent inflation
     const average = (values: number[]): number => {
         const filtered = values.filter(v => v !== null && v !== undefined);
-        if (filtered.length === 0) return 50;
+        if (filtered.length === 0) return Math.max(5, 50 - skipPenalty); // Apply penalty to skipped tests
         const avg = filtered.reduce((a, b) => a + b, 0) / filtered.length;
-        return Math.min(95, avg); // Cap at 95 to allow for growth
+        return Math.max(5, Math.min(95, avg - skipPenalty)); // Apply penalty globally
     };
 
     // ===== PHYSICAL STATS =====

@@ -390,6 +390,16 @@ export interface FullCalibrationReport extends TraitAnalysisResult {
         rarity: 'Common' | 'Elite' | 'Mythic';
         desc: string;
     }[];
+    biometrics?: {
+        dateOfBirth?: string;
+        age?: number;
+        gender?: string;
+        height?: string;
+        weight?: string;
+        benchPress?: string;
+        breathHold?: number;
+        cnsReactionSpeed?: number;
+    };
 }
 
 export interface TaskReport {
