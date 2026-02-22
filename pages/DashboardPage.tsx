@@ -7,6 +7,9 @@ import Card from '../components/ui/Card';
 import CompanionMessage from '../components/CompanionMessage';
 import SubstatLabel from '../components/SubstatLabel';
 import DecayStatusWidget from '../components/DecayStatusWidget';
+import DecayRecoveryWidget from '../components/DecayRecoveryWidget';
+import SmartTaskSuggestionsWidget from '../components/SmartTaskSuggestionsWidget';
+import AnalyticsDashboardWidget from '../components/AnalyticsDashboardWidget';
 import { RANKS, ATTRIBUTE_RANKS, RANK_PERCENTILES } from '../constants';
 import { Stat, StatName, SubStatName, Task, TaskType, AttributeRankName } from '../types';
 import { ArrowRight, Activity, TrendingUp, Flame, Calendar, BarChart, Crosshair, Check, Zap, ListChecks, Shield, PenLine, Headphones, Binary, Cloud, Clock, FileText, ChevronRight, LayoutGrid, Globe, Languages, Plus } from 'lucide-react';
@@ -187,7 +190,7 @@ const ResetCountdown: React.FC = () => {
 };
 
 const DashboardPage: React.FC = () => {
-    const { gameState, isLoading, completeTask, incrementWeeklyTask } = useGameState();
+    const { gameState, isLoading, completeTask, incrementWeeklyTask, addToast } = useGameState();
     const [tacticalAdvice, setTacticalAdvice] = useState<{ title: string; suggestions: string[] } | null>(null);
     const [loadingAdvice, setLoadingAdvice] = useState(false);
     const [isScrolled, setIsScrolled] = useState(false);
@@ -285,6 +288,17 @@ const DashboardPage: React.FC = () => {
                     {/* DECAY STATUS WIDGET - HIGH PRIORITY */}
                     <DecayStatusWidget decayInfo={decayInfo} />
 
+                    {/* DECAY RECOVERY WIDGET - If decay is imminent or active */}
+                    {decayInfo?.isDecayImminent || decayInfo?.isDecayActive && (
+                        <DecayRecoveryWidget 
+                            decayInfo={decayInfo} 
+                            stats={stats}
+                            onRecoveryTaskComplete={(task, bonusXP) => {
+                                addToast(`Recovery task "${task.title}" completed! +${bonusXP}% bonus`, 'success');
+                            }}
+                        />
+                    )}
+
                     {/* CENTRAL anchor */}
                     <Card className="!bg-black/92 border-purple-500/40 shadow-[0_0_22px_rgba(168,85,247,0.25)]">
                         <CompanionMessage />
@@ -332,6 +346,17 @@ const DashboardPage: React.FC = () => {
                             <NeuralLinguisticSync totalHours={totalImmersionHours} />
 
                             <NeuralPulseHeatmap history={statHistory} />
+
+                            {/* SMART SUGGESTIONS WIDGET */}
+                            <SmartTaskSuggestionsWidget
+                                tasks={growthHabits}
+                                stats={stats}
+                                statHistory={statHistory}
+                                currentStreak={currentStreak}
+                                onTaskSelect={(task) => {
+                                    completeTask(growthHabits.find(h => h.id === task.id)?.pathId || '', task.id);
+                                }}
+                            />
 
                             {/* Growth ledger – mobile friendly */}
                             <Card className="!bg-black/92 border-cyan-500/30 relative overflow-hidden rounded-md">
@@ -542,6 +567,15 @@ const DashboardPage: React.FC = () => {
                                     </div>
                                 )}
                             </Card>
+
+                            {/* ANALYTICS DASHBOARD WIDGET */}
+                            <AnalyticsDashboardWidget
+                                stats={stats}
+                                statHistory={statHistory}
+                                currentStreak={currentStreak}
+                                totalXP={stats.reduce((sum, s) => sum + s.value, 0)}
+                                rank={rank}
+                            />
                         </div>
                     </div>
 
