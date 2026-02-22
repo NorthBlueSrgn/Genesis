@@ -8,6 +8,7 @@ import { Lock, User, Mail, Shield } from 'lucide-react';
 
 const LoginPage: React.FC = () => {
     const { login: appLogin } = useGameState();
+    const [usernameOrEmail, setUsernameOrEmail] = useState('');
     const [email, setEmail] = useState('');
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
@@ -20,9 +21,10 @@ const LoginPage: React.FC = () => {
         setError('');
         setIsLoading(true);
         try {
-            const success = await appLogin(email, password);
+            // Allow login with either username or email
+            const success = await appLogin(usernameOrEmail, password);
             if (!success) {
-                setError('Authentication failed. Check credentials.');
+                setError('Authentication failed. Check username/email and password.');
             }
         } catch (e: any) {
             setError(e.message || 'Login failed.');
@@ -34,6 +36,14 @@ const LoginPage: React.FC = () => {
     const handleCreate = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
+        
+        // Validate email format
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            setError('Please provide a valid email address (e.g., user@example.com)');
+            return;
+        }
+        
         setIsLoading(true);
         
         try {
@@ -71,33 +81,53 @@ const LoginPage: React.FC = () => {
                 </div>
 
                 <form onSubmit={isCreating ? handleCreate : handleLogin} className="space-y-6">
-                    <div>
-                        <label className="block text-gray-500 text-[10px] font-bold mb-1.5 uppercase tracking-[0.2em] font-mono">Identity Email</label>
-                        <div className="flex items-center bg-black/60 border border-gray-800 focus-within:border-purple-500 transition-all rounded-sm p-3 group">
-                            <Mail className="text-gray-600 group-focus-within:text-purple-400 transition-colors mr-3" size={18} />
-                            <input 
-                                type="email" 
-                                value={email} 
-                                onChange={e => setEmail(e.target.value)} 
-                                className="bg-transparent w-full text-white focus:outline-none font-mono text-sm"
-                                placeholder="name@network.com"
-                                required
-                            />
-                        </div>
-                    </div>
+                    {isCreating ? (
+                        // Registration mode: show email and username fields
+                        <>
+                            <div>
+                                <label className="block text-gray-500 text-[10px] font-bold mb-1.5 uppercase tracking-[0.2em] font-mono">Identity Email</label>
+                                <div className="flex items-center bg-gray-700 border border-gray-800 focus-within:border-purple-500 transition-all rounded-sm p-3 group">
+                                    <Mail className="text-gray-600 group-focus-within:text-purple-400 transition-colors mr-3" size={18} />
+                                    <input 
+                                        type="email" 
+                                        value={email} 
+                                        onChange={e => setEmail(e.target.value)} 
+                                        className="bg-transparent w-full text-white focus:outline-none font-mono text-sm"
+                                        placeholder="name@network.com"
+                                        required
+                                    />
+                                </div>
+                            </div>
 
-                    {isCreating && (
-                        <div className="animate-in fade-in slide-in-from-top-2 duration-300">
-                            <label className="block text-gray-500 text-[10px] font-bold mb-1.5 uppercase tracking-[0.2em] font-mono">Public Designation</label>
-                            <div className="flex items-center bg-black/60 border border-gray-800 focus-within:border-purple-500 transition-all rounded-sm p-3 group">
+                            <div>
+                                <label className="block text-gray-500 text-[10px] font-bold mb-1.5 uppercase tracking-[0.2em] font-mono">Public Designation (Username)</label>
+                                <div className="flex items-center bg-gray-700 border border-gray-800 focus-within:border-purple-500 transition-all rounded-sm p-3 group">
+                                    <User className="text-gray-600 group-focus-within:text-purple-400 transition-colors mr-3" size={18} />
+                                    <input 
+                                        type="text" 
+                                        value={username} 
+                                        onChange={e => setUsername(e.target.value)} 
+                                        className="bg-transparent w-full text-white focus:outline-none font-mono text-sm"
+                                        placeholder="operative_codename"
+                                        required
+                                    />
+                                </div>
+                                <p className="text-gray-600 text-[9px] mt-1">3-20 characters, letters/numbers/underscore/hyphen only</p>
+                            </div>
+                        </>
+                    ) : (
+                        // Login mode: show username/email field
+                        <div>
+                            <label className="block text-gray-500 text-[10px] font-bold mb-1.5 uppercase tracking-[0.2em] font-mono">Username or Email</label>
+                            <div className="flex items-center bg-gray-700 border border-gray-800 focus-within:border-purple-500 transition-all rounded-sm p-3 group">
                                 <User className="text-gray-600 group-focus-within:text-purple-400 transition-colors mr-3" size={18} />
                                 <input 
                                     type="text" 
-                                    value={username} 
-                                    onChange={e => setUsername(e.target.value)} 
+                                    value={usernameOrEmail} 
+                                    onChange={e => setUsernameOrEmail(e.target.value)} 
                                     className="bg-transparent w-full text-white focus:outline-none font-mono text-sm"
-                                    placeholder="OPERATIVE_ID"
-                                    required={isCreating}
+                                    placeholder="operative_codename or email@network.com"
+                                    required
                                 />
                             </div>
                         </div>
@@ -105,7 +135,7 @@ const LoginPage: React.FC = () => {
                     
                     <div>
                         <label className="block text-gray-500 text-[10px] font-bold mb-1.5 uppercase tracking-[0.2em] font-mono">Encrypted Access Key</label>
-                        <div className="flex items-center bg-black/60 border border-gray-800 focus-within:border-purple-500 transition-all rounded-sm p-3 group">
+                        <div className="flex items-center bg-gray-700 border border-gray-800 focus-within:border-purple-500 transition-all rounded-sm p-3 group">
                             <Lock className="text-gray-600 group-focus-within:text-purple-400 transition-colors mr-3" size={18} />
                             <input 
                                 type="password" 

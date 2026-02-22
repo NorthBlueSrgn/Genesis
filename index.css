@@ -1,5 +1,8 @@
-
 @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@400;600;700&family=Permanent+Marker&family=Nanum+Pen+Script&family=JetBrains+Mono:wght@400;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 :root {
   --color-bg-deep: #010204;
@@ -107,4 +110,280 @@ body {
   filter: brightness(1.2);
   box-shadow: 0 0 25px var(--color-accent);
   transform: scale(1.02);
+}
+
+/* HANDWRITTEN ANNOTATION STYLES */
+.handwritten-annotation {
+  font-family: 'Permanent Marker', cursive;
+  font-size: 12px;
+  color: #dc2626;
+  opacity: 0.8;
+  transform: rotate(-3deg);
+  text-shadow: 1px 1px 0 rgba(220, 38, 38, 0.2);
+  letter-spacing: 0.5px;
+}
+
+.annotation-box {
+  border: 2px dashed #dc2626;
+  padding: 8px;
+  background: rgba(220, 38, 38, 0.05);
+  border-radius: 2px;
+  position: relative;
+}
+
+.annotation-connector {
+  position: absolute;
+  border-left: 1px dashed #dc2626;
+  border-top: 1px dashed #dc2626;
+  opacity: 0.4;
+}
+
+/* CLASSIFIED STAMP */
+.classified-stamp-red {
+  font-family: 'Permanent Marker', cursive;
+  font-size: 24px;
+  font-weight: 900;
+  color: rgba(220, 38, 38, 0.6);
+  text-shadow: 2px 2px 0 rgba(220, 38, 38, 0.3), -1px -1px 0 rgba(220, 38, 38, 0.2);
+  letter-spacing: 2px;
+  transform: rotate(-15deg);
+  opacity: 0.7;
+  text-decoration: underline wavy #dc2626;
+  animation: stamp-pulse 3s ease-in-out infinite;
+}
+
+@keyframes stamp-pulse {
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 0.5; }
+}
+
+/* FILM GRAIN TEXTURE */
+.bg-film-grain {
+  position: absolute;
+  inset: 0;
+  background-image: 
+    url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><filter id="noise"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="4" /></filter><rect width="100" height="100" fill="rgba(255,255,255,0.02)" filter="url(%23noise)" /></svg>');
+  background-repeat: repeat;
+  opacity: 0.15;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* SCANLINE OVERLAY */
+.scanline-overlay {
+  background-image: repeating-linear-gradient(
+    0deg,
+    rgba(0, 0, 0, 0.15),
+    rgba(0, 0, 0, 0.15) 1px,
+    transparent 1px,
+    transparent 2px
+  );
+  animation: scan-drift 8s linear infinite;
+}
+
+@keyframes scan-drift {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(10px); }
+}
+
+/* GRID BACKGROUND */
+.grid-background {
+  background-image: 
+    linear-gradient(0deg, rgba(168, 85, 247, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(168, 85, 247, 0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+  background-position: 0 0, 20px 20px;
+}
+
+/* BIOMETRIC SCAN ANIMATION */
+.biometric-scan-line {
+  position: absolute;
+  width: 100%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #a855f7, transparent);
+  animation: scan-line 3s ease-in-out infinite;
+  opacity: 0.5;
+}
+
+@keyframes scan-line {
+  0% { top: 10%; }
+  50% { top: 50%; }
+  100% { top: 90%; }
+}
+
+/* CHROMATIC ABERRATION */
+.chromatic-aberration {
+  position: relative;
+  text-shadow: 
+    2px 0 0 rgba(255, 0, 0, 0.3),
+    -2px 0 0 rgba(0, 255, 255, 0.3);
+}
+
+/* DECRYPTING TEXT EFFECT */
+.decrypting-text {
+  animation: decrypt 0.5s ease-out;
+}
+
+@keyframes decrypt {
+  0% { 
+    opacity: 0.3;
+    text-shadow: 0 0 10px rgba(168, 85, 247, 0.5);
+  }
+  100% { 
+    opacity: 1;
+    text-shadow: none;
+  }
+}
+
+/* SCAN ANIMATION FOR BIOMETRIC */
+@keyframes scan {
+  0%, 100% { transform: scaleY(1); }
+  50% { transform: scaleY(0.98); }
+}
+
+/* MOBILE RESPONSIVENESS */
+@media (max-width: 768px) {
+  body {
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+  
+  /* Make text more readable on mobile */
+  .font-orbitron {
+    letter-spacing: 0.05em !important;
+  }
+  
+  /* Adjust padding for mobile */
+  .mobile-pad {
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
+  }
+  
+  /* Stack elements vertically on mobile */
+  .mobile-stack {
+    flex-direction: column !important;
+  }
+  
+  /* Hide vignette on mobile for better visibility */
+  .vignette-hud {
+    opacity: 0.3;
+  }
+  
+  /* Reduce HUD bracket size on mobile */
+  .hud-bracket {
+    width: 20px;
+    height: 20px;
+  }
+  
+  /* Make buttons more touch-friendly */
+  .btn-primary {
+    padding: 0.75rem 1.5rem !important;
+    font-size: 0.75rem !important;
+  }
+  
+  /* Scale down large headings */
+  h1, .text-5xl, .text-6xl {
+    font-size: 1.5rem !important;
+  }
+  
+  h2, .text-4xl {
+    font-size: 1.25rem !important;
+  }
+  
+  h3, .text-3xl {
+    font-size: 1.125rem !important;
+  }
+  
+  /* Reduce excessive tracking on mobile */
+  [class*="tracking-"] {
+    letter-spacing: 0.1em !important;
+  }
+  
+  /* Make cards more compact */
+  .hud-card {
+    padding: 1rem !important;
+  }
+  
+  /* Reduce gap between elements */
+  .gap-16 {
+    gap: 2rem !important;
+  }
+  
+  .gap-12 {
+    gap: 1.5rem !important;
+  }
+  
+  .gap-8 {
+    gap: 1rem !important;
+  }
+  
+  /* Hide blueprint background on mobile for performance */
+  .blueprint-bg {
+    opacity: 0.05 !important;
+  }
+  
+  /* Make modals full-screen on mobile */
+  .fixed.inset-0 > div {
+    max-width: 100% !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
+    max-height: 100vh !important;
+  }
+}
+
+/* Small mobile screens (phones in portrait) */
+@media (max-width: 480px) {
+  /* Even more compact spacing */
+  .p-10 {
+    padding: 1rem !important;
+  }
+  
+  .p-8 {
+    padding: 0.75rem !important;
+  }
+  
+  .p-6 {
+    padding: 0.5rem !important;
+  }
+  
+  /* Single column layout */
+  .grid-cols-2, .grid-cols-3, .grid-cols-4 {
+    grid-template-columns: repeat(1, minmax(0, 1fr)) !important;
+  }
+  
+  /* Make text even smaller */
+  .text-2xl {
+    font-size: 1rem !important;
+  }
+  
+  .text-xl {
+    font-size: 0.875rem !important;
+  }
+}
+
+/* Touch-friendly tap targets */
+@media (hover: none) and (pointer: coarse) {
+  button, .cursor-pointer {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+/* Prevent text selection on touch devices */
+.no-select {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+/* Drag and drop styling */
+.dragging {
+  opacity: 0.5;
+  transform: scale(0.95);
+}
+
+.drag-over {
+  border-color: #22d3ee !important;
+  background-color: rgba(34, 211, 238, 0.05) !important;
 }

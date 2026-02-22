@@ -63,7 +63,7 @@ const ChapterBlackPage: React.FC = () => {
     const groupedLore = useMemo(() => {
         if (!gameState) return {};
         // Sort lore ascending by chapter number first
-        const sortedLore = [...gameState.lore].sort((a, b) => a.chapterNumber - b.chapterNumber);
+        const sortedLore = [...(gameState.lore || [])].sort((a, b) => a.chapterNumber - b.chapterNumber);
         
         return sortedLore.reduce((acc, entry) => {
             const arcStart = Math.floor((entry.chapterNumber - 1) / 10) * 10 + 1;
@@ -75,7 +75,7 @@ const ChapterBlackPage: React.FC = () => {
             acc[arcKey].push(entry);
             return acc;
         }, {} as Record<string, LoreEntry[]>);
-    }, [gameState.lore]);
+    }, [gameState?.lore]);
 
     if (isLoading || !gameState) {
         return <Loader text="Accessing Chapter Black..." />;
@@ -100,10 +100,10 @@ const ChapterBlackPage: React.FC = () => {
 
     const { chapterBlack, lore } = gameState;
     const { isUnlockedToday, dailyTaskCompletionPercentage } = chapterBlack;
-    const canUnlock = dailyTaskCompletionPercentage >= 80;
+    const canUnlock: boolean = dailyTaskCompletionPercentage >= 80;
     
     const latestChapter = lore.length > 0 ? [...lore].sort((a,b) => b.chapterNumber - a.chapterNumber)[0] : null;
-    const needsChoice = latestChapter && latestChapter.choices && latestChapter.choices.length > 0 && !latestChapter.userChoice;
+    const needsChoice: boolean = !!(latestChapter && latestChapter.choices && latestChapter.choices.length > 0 && !latestChapter.userChoice);
 
     const renderDailyChronicle = () => {
         if (needsChoice && latestChapter) {
@@ -131,7 +131,7 @@ const ChapterBlackPage: React.FC = () => {
             <Card>
                 <h2 className="text-2xl font-bold font-orbitron hud-text-accent mb-4">Daily Chronicle</h2>
                 <p className="text-gray-400 mb-2 text-center">Maintain 80% daily task completion to record today's entry.</p>
-                <div className="w-full bg-black/30 rounded-full h-4 my-4 border border-gray-700 p-0.5">
+                <div className="w-full bg-gray-800 rounded-full h-4 my-4 border border-gray-700 p-0.5">
                     <div
                         className="bg-gradient-to-r from-purple-500 to-fuchsia-500 rounded-full h-full text-xs flex items-center justify-center font-bold text-black"
                         style={{ width: `${dailyTaskCompletionPercentage}%`, transition: 'width 0.5s ease-in-out' }}
@@ -156,7 +156,7 @@ const ChapterBlackPage: React.FC = () => {
                         ) : needsChoice ? (
                              <><Lock className="w-5 h-5 mr-2" /> Make a choice to continue</>
                         ) : canUnlock ? (
-                            <><BookOpen className="w-5 h-5 mr-2" /> Record Today's Entry</>
+                            <><BookOpen className="w-5 h-5 mr-2" /> Unlock Today's Chapter</>
                         ) : (
                             <><Lock className="w-5 h-5 mr-2" /> {80 - dailyTaskCompletionPercentage}% More Required</>
                         )}

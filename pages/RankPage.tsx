@@ -51,7 +51,7 @@ const RankPage: React.FC = () => {
     return (
         <div>
             {isReportVisible && gameState.calibrationAnalysis && (
-                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4" onClick={() => setIsReportVisible(false)}>
+                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-800 p-4" onClick={() => setIsReportVisible(false)}>
                     <div className="w-full max-w-7xl h-[95vh] relative" onClick={e => e.stopPropagation()}>
                         <button onClick={() => setIsReportVisible(false)} className="absolute top-4 right-4 text-gray-400 hover:text-white z-50 bg-black/50 rounded-full p-2">
                             <X size={24} />

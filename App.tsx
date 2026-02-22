@@ -35,12 +35,12 @@ import SplashSequence from './components/ui/SplashSequence';
 import { Flame } from 'lucide-react';
 
 const MantraHeader: React.FC = () => (
-    <div className="w-full bg-black/80 border-b border-amber-500/20 py-2 px-6 flex items-center justify-center gap-4 z-[40] backdrop-blur-md">
-        <Flame size={14} className="text-amber-500 animate-pulse hidden sm:block" />
-        <p className="text-[11px] md:text-sm text-center font-serif italic text-amber-200/80 tracking-wide drop-shadow-[0_0_8px_rgba(251,191,36,0.3)]">
-            "Do you not know that in a race all the runners run, but only one gets the prize? <span className="text-amber-400 font-bold">Run in such a way as to get the prize.</span>"
+    <div className="w-full bg-black border-b border-purple-500/30 py-2 px-6 flex items-center justify-center gap-4 z-[40] backdrop-blur-md">
+        <Flame size={14} className="text-purple-400 animate-pulse hidden sm:block" />
+        <p className="text-[11px] md:text-sm text-center font-serif italic text-purple-300/80 tracking-wide drop-shadow-[0_0_8px_rgba(168,85,247,0.3)]">
+            "Do you not know that in a race all the runners run, but only one gets the prize? <span className="text-purple-400 font-bold">Run in such a way as to get the prize.</span>"
         </p>
-        <span className="text-[9px] font-black font-orbitron text-amber-600/60 uppercase tracking-[0.2em] whitespace-nowrap">— 1 Corinthians 9:24</span>
+        <span className="text-[9px] font-black font-orbitron text-purple-600/60 uppercase tracking-[0.2em] whitespace-nowrap">— 1 Corinthians 9:24</span>
     </div>
 );
 
@@ -52,12 +52,12 @@ const AppRoutes: React.FC = () => {
     if (gameState && !gameState.hasOnboarded) return <OnboardingPage />;
 
     return (
-        <div className="flex h-screen overflow-hidden bg-[#010409] text-white">
+        <div className="flex h-screen overflow-hidden bg-black text-white">
             <CommandPalette />
             <Navigation isMobileOpen={isMobileNavOpen} onClose={() => setIsMobileNavOpen(false)} />
             <div className="flex-1 flex flex-col md:ml-64 h-full overflow-hidden relative">
                 <MantraHeader />
-                <div className="md:hidden flex items-center justify-between p-4 bg-gray-900 border-b border-gray-800 z-20">
+                <div className="md:hidden flex items-center justify-between p-4 bg-black border-b border-purple-500/30 z-20">
                     <span className="font-orbitron font-bold text-purple-400 uppercase tracking-widest">Genesis</span>
                     <button onClick={() => setIsMobileNavOpen(true)} className="p-2 text-gray-400">
                         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
@@ -115,7 +115,9 @@ const AppContent: React.FC = () => {
                     if (!processedAchievementIds.current.has(uniqueKey)) {
                         processedAchievementIds.current.add(uniqueKey);
                         dispatch({ type: 'UNLOCK_ACHIEVEMENT_TIER', payload: { achievementId, tier: newTier } });
-                        addToast(`Achievement: ${achievementId} Unlocked`, 'special');
+                        // Only show 'special' toasts for higher tiers (3+); lower tiers are 'success'
+                        const toastType = newTier >= 3 ? 'special' : 'success';
+                        addToast(`Achievement: ${achievementId} (Tier ${newTier})`, toastType);
                     }
                 });
             }

@@ -20,19 +20,15 @@ export const interpolate = (value: number, mapping: [number, number][]): number 
 };
 
 export const mapScoreToRank = (score: number): AttributeRankName => {
-    const ranks = [
-        AttributeRankName.SS_PLUS,
-        AttributeRankName.SS,
-        AttributeRankName.S,
-        AttributeRankName.A,
-        AttributeRankName.B,
-        AttributeRankName.C,
-        AttributeRankName.D,
-        AttributeRankName.E
-    ];
-    for (const rank of ranks) {
-        if (score >= RANK_PERCENTILES[rank].min) return rank;
-    }
+    // Maps percentile score (0-100) to rank using FIXED percentile thresholds
+    // E: 0-19, D: 20-39, C: 40-59, B: 60-74, A: 75-89, S: 90-96, SS: 97-99, SS+: 99.9-100
+    if (score >= 99.9) return AttributeRankName.SS_PLUS;
+    if (score >= 97) return AttributeRankName.SS;
+    if (score >= 90) return AttributeRankName.S;
+    if (score >= 75) return AttributeRankName.A;
+    if (score >= 60) return AttributeRankName.B;
+    if (score >= 40) return AttributeRankName.C;
+    if (score >= 20) return AttributeRankName.D;
     return AttributeRankName.E;
 };
 
@@ -111,7 +107,8 @@ export const performTraitAnalysis = (percentiles: Record<StatName, number>, inpu
     const isTooShort = narrativeInput.trim().length < 20;
     const isGibberish = isSpam || isTooShort;
 
-    const avgScore = isGibberish ? 0 : (Object.values(percentiles).reduce((a, b) => a + b, 0) / 6);
+    const percentileValues = percentiles ? Object.values(percentiles) : [];
+    const avgScore = isGibberish ? 0 : (percentileValues.length > 0 ? percentileValues.reduce((a, b) => a + b, 0) / percentileValues.length : 0);
     const age = parseInt(inputs['biometric-data']?.age || '25');
     
     // Tk Mapping (Talent Class - Continuous)
@@ -428,26 +425,22 @@ export const calculateSubstatsFromAllTests = (inputs: any): Record<SubStatName, 
     const religiosity = parseInt(psycheSocial.religiosity) || 50;
     substats[SubStatName.Faith] = religiosity;
 
-    // Purpose: From narrative clarity + dilemma choices
+    // Purpose: From narrative clarity
     const narrative = inputs['narrative-prompt']?.['narrative-prompt'] || "";
     const narrativePurpose = narrative.length > 100 ? 60 : (narrative.length > 50 ? 50 : 30);
-    const dilemmaData = inputs['dilemma-screening'] || {};
-    const dilemmaConsistency = dilemmaData.spiritDilemmas ? 60 : 50; // Consistent moral stance
-    substats[SubStatName.Purpose] = average([narrativePurpose, dilemmaConsistency]);
+    substats[SubStatName.Purpose] = narrativePurpose;
 
     // Tranquility: Inverse of stress
     const stressLevel = parseInt(vitality.stressLevels) || 50;
     substats[SubStatName.Tranquility] = Math.min(95, 100 - stressLevel);
 
-    // Empathy: From social confidence + dilemma choices
+    // Empathy: From social confidence
     const socialConfidence = parseInt(psycheSocial.socialConfidence) || 50;
-    const empathyDilemma = dilemmaData.spiritDilemmas ? 55 : 50; // Empathetic choices show
-    substats[SubStatName.Empathy] = average([socialConfidence, empathyDilemma]);
+    substats[SubStatName.Empathy] = socialConfidence;
 
-    // Conviction: From conflict resolution + dilemma consistency
+    // Conviction: From conflict resolution
     const conflictResolution = parseInt(psycheSocial.conflictResolution) || 50;
-    const convictionDilemma = dilemmaData.spiritDilemmas ? 65 : 50; // Moral certainty
-    substats[SubStatName.Conviction] = average([conflictResolution, convictionDilemma]);
+    substats[SubStatName.Conviction] = conflictResolution;
 
     // ===== PSYCHE STATS =====
     const stroop = inputs['resilience-stroop'] || {};

@@ -102,7 +102,7 @@ const FocusPage = () => {
             const achievement = checkFocusAchievement(gameState);
             if (achievement) {
                 dispatch({ type: 'UNLOCK_ACHIEVEMENT_TIER', payload: { achievementId: 'common-11', tier: 1 } });
-                addToast(`Achievement Unlocked: ${achievement.name}`, 'special');
+                addToast(`Achievement: ${achievement.name}`, 'success');
             }
         }
 
@@ -229,7 +229,7 @@ const FocusPage = () => {
             {formatTime(timeLeft)}
         </div>
         
-        <div className="max-w-xl p-4 bg-black/20 rounded-lg border border-gray-700">
+        <div className="max-w-xl p-4 bg-gray-900 rounded-lg border border-gray-700">
             <p className="text-lg font-bold text-gray-400 mb-2 flex items-center justify-center gap-2"><Target /> Current Objective</p>
             <p className="text-2xl text-white">{selectedTask?.description}</p>
         </div>

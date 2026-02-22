@@ -1,4 +1,3 @@
-
 // contexts/GameStateContext.tsx
 import React, { createContext, useContext, useReducer, useEffect, useState } from 'react';
 /* Added StatName and SubStatName to the imports from '../types' to resolve find name errors */
@@ -9,6 +8,7 @@ import { RANKS, INITIAL_STATS, STAT_SUBSTAT_MAP, calculateXpForNextLevel, getRan
 import { calculateScores, mapScoreToRank } from '../services/scoringService';
 import { generateAutomatedSchedule, generateNewMission, generatePromotionExam, generateNewChapter, generateSideMission, generateAdaptiveStage } from '../services/geminiService';
 import { CODEX_CATEGORIES } from '../data/codexData';
+import { PREDETERMINED_STATS, DEFAULT_TALENT_DNA, DEFAULT_TALENT_PROFILE, DEFAULT_ALIGNMENT, DEFAULT_BIOMETRICS, DEFAULT_CALIBRATION_REPORT } from '../data/predeterminedStats';
 
 export interface GameStateContextType {
   gameState: GameState | null;
@@ -24,6 +24,7 @@ export interface GameStateContextType {
   addToast: (message: string, type: ToastType) => void;
   addLog: (message: string, type: LogType) => void;
   completeTask: (pathId: string, taskId: string, evaluation?: EvaluationResult) => void;
+  incrementWeeklyTask: (pathId: string, taskId: string) => void; // NEW: Increment weekly task counter
   toggleHistoricalHabit: (date: string, habitId: string, status: boolean | 'breach') => void;
   setDailyNote: (date: string, note: string) => void;
   addVoidHabit: (habit: VoidHabit) => void;
@@ -64,6 +65,13 @@ export interface GameStateContextType {
   setNotificationPermission: (permission: 'default' | 'granted' | 'denied') => void;
   dismissSpecialEvent: () => void;
   updateDailyMetrics: (metrics: Partial<DailyMetrics>) => void;
+  setWaterGoal: (goal: number) => void;
+  setStepGoal: (goal: number) => void;
+  // NEW: Task management
+  editTask: (pathId: string, taskId: string, updates: Partial<Task>) => void;
+  reorderTasks: (pathId: string, taskIds: string[]) => void;
+  snoozeTask: (pathId: string, taskId: string, until?: string) => void;
+  unsnoozeTask: (pathId: string, taskId: string) => void;
 }
 
 export const GameStateContext = createContext<GameStateContextType | undefined>(undefined);
@@ -75,20 +83,26 @@ export const useGameState = (): GameStateContextType => {
 };
 
 const processLoadedState = (savedState: any, username: string): GameState => {
+    // Use predetermined stats for new users (auto-complete onboarding)
+    const defaultStats = PREDETERMINED_STATS.map(s => ({
+        ...s,
+        lastIncreased: new Date().toISOString(),
+        subStats: s.subStats.map(ss => ({
+            ...ss,
+            lastIncreased: new Date().toISOString()
+        }))
+    }));
+
     const defaultState: GameState = {
         userName: username,
-        hasOnboarded: false,
+        hasOnboarded: false, // New users start with screening test
         rank: RANKS[0],
         xp: 0,
-        stats: INITIAL_STATS.map(s => ({
-            ...s,
-            rank: 'E' as AttributeRankName,
-            subStats: STAT_SUBSTAT_MAP[s.name].map(ss => ({ name: ss, value: 0, rank: 'E' as AttributeRankName, lastIncreased: new Date().toISOString() })),
-            lastIncreased: new Date().toISOString(),
-        })),
+        stats: defaultStats, // Use predetermined stats instead of empty INITIAL_STATS
         paths: [],
         voidHabits: [],
         habitHistory: {},
+        weeklyTaskHistory: {}, // NEW: Track weekly task completions
         dailyNotes: {},
         missions: [],
         promotionExam: null,
@@ -112,28 +126,76 @@ const processLoadedState = (savedState: any, username: string): GameState => {
         isTourActive: false,
         tourStep: 0,
         specialEvent: null,
-        calibrationAnalysis: undefined,
+        calibrationAnalysis: DEFAULT_CALIBRATION_REPORT, // Use predetermined calibration report for dossier display
         initialStatsSnapshot: null,
         notificationPermission: 'default',
         logs: [],
         benchmarks: {},
+        benchmarkMetrics: [],
+        statProgressionHistory: [],
         dailyMetrics: { waterIntake: 0, steps: 0, calories: 0, protein: 0, carbs: 0, fats: 0, sleepScore: 0, sleepHours: 0, weightKg: 0, immersionHours: 0 },
-        totalImmersionHours: 0
+        totalImmersionHours: 0,
+        waterGoal: 2000, // Default 2L water goal
+        stepGoal: 10000, // Default 10k step goal
+        waterGoalReachedToday: false,
+        stepGoalReachedToday: false,
+        protocolMetrics: [], // Track protocol completions
+        protocolHistory: [], // Daily protocol log
+        metricsHistory: [], // Water/step history
+        alignment: DEFAULT_ALIGNMENT, // Use predetermined alignment
+        talentDna: DEFAULT_TALENT_DNA, // Use predetermined talent DNA
+        archetypeTitle: DEFAULT_TALENT_PROFILE.talentClass, // Use predetermined archetype
+        biometrics: DEFAULT_BIOMETRICS // Use predetermined biometrics template
     };
 
     const migratedState: GameState = { ...defaultState, ...savedState };
+    
     if (!migratedState.dailyMetrics) migratedState.dailyMetrics = defaultState.dailyMetrics;
+    if (!migratedState.waterGoal) migratedState.waterGoal = defaultState.waterGoal;
+    if (!migratedState.stepGoal) migratedState.stepGoal = defaultState.stepGoal;
+    if (migratedState.waterGoalReachedToday === undefined) migratedState.waterGoalReachedToday = false;
+    if (migratedState.stepGoalReachedToday === undefined) migratedState.stepGoalReachedToday = false;
+    if (!migratedState.protocolMetrics) migratedState.protocolMetrics = [];
+    if (!migratedState.protocolHistory) migratedState.protocolHistory = [];
+    if (!migratedState.metricsHistory) migratedState.metricsHistory = [];
     if (!migratedState.habitHistory) migratedState.habitHistory = {};
     if (!migratedState.voidHabits) migratedState.voidHabits = [];
     if (!migratedState.dailyNotes) migratedState.dailyNotes = {};
+    if (!migratedState.statHistory) migratedState.statHistory = [];
     
+    // Force predetermined stats for all users (new or existing without proper stats)
+    // Only override if stats are missing or if they're all at default/E rank (indicating uninitialized)
+    const hasValidStats = migratedState.stats && migratedState.stats.length > 0 && 
+                         migratedState.stats.some(s => s.value > 0 && s.rank !== 'E');
+    if (!hasValidStats) {
+        migratedState.stats = defaultState.stats;
+    }
+    
+    if (!migratedState.paths) migratedState.paths = [];
+    if (!migratedState.missions) migratedState.missions = [];
+    if (!migratedState.sideMissions) migratedState.sideMissions = [];
+    if (!migratedState.journal) migratedState.journal = [];
+    if (!migratedState.lore) migratedState.lore = [];
+    if (!migratedState.chatSessions) migratedState.chatSessions = [];
+    if (!migratedState.unlockedCodexEntryIds) migratedState.unlockedCodexEntryIds = [];
+    if (!migratedState.unlockedAchievements) migratedState.unlockedAchievements = [];
+    
+    // Recalculate ranks based on current values
     migratedState.stats = migratedState.stats.map(stat => {
         const newSubStats = stat.subStats.map(ss => ({ ...ss, rank: getRankForSubstatValue(ss.value, ss.name) }));
         const totalValue = newSubStats.reduce((sum, ss) => sum + ss.value, 0);
         return { ...stat, value: totalValue, subStats: newSubStats, rank: getRankForMainStatValue(totalValue, stat.name) };
     });
+    
+    // Recalculate overall rank
     const { apexThreatIndex } = calculateScores(migratedState.stats);
     migratedState.rank = RANKS.find(r => r.name === mapScoreToRank(apexThreatIndex)) || RANKS[0];
+    
+    // Ensure calibration analysis exists (for dossier display)
+    if (!migratedState.calibrationAnalysis) {
+        migratedState.calibrationAnalysis = DEFAULT_CALIBRATION_REPORT;
+    }
+    
     return migratedState;
 };
 
@@ -184,11 +246,18 @@ export const GameStateProvider: React.FC<{ children: React.ReactNode; notify: (m
 
     const contextValue: GameStateContextType = {
         gameState, dispatch, isLoading, isLoggedIn: !!isLoggedIn,
-        login: async (username, password) => {
-            if (password && username.includes('@')) {
-                try { await firebaseService.signIn(username, password); return true; } catch (e) { return false; }
+        login: async (usernameOrEmail, password) => {
+            if (!password || !usernameOrEmail) {
+                return false;
             }
-            return false;
+            try {
+                // signIn function in firebaseService handles both username and email lookup
+                await firebaseService.signIn(usernameOrEmail, password);
+                return true;
+            } catch (e) {
+                console.error('Login error:', e);
+                return false;
+            }
         },
         logout: () => {
             firebaseService.signOutUser();
@@ -197,12 +266,24 @@ export const GameStateProvider: React.FC<{ children: React.ReactNode; notify: (m
         seedInitialState: (stats, xp = 0, calibrationAnalysis, initialStatsSnapshot, username, talentDna, talentArchetype, biometrics, resonanceVector) => {
             const name = username || "Operative";
             const initialForsakenStats = stats.map(s => ({ name: s.name, value: Math.round(s.value * 1.1) }));
+            
+            // Calculate the proper rank from stats instead of hardcoding to RANKS[0]
+            const { apexThreatIndex } = calculateScores(stats);
+            const calculatedRank = RANKS.find(r => r.name === mapScoreToRank(apexThreatIndex)) || RANKS[0];
+            
             const newState: GameState = {
-                userName: name, hasOnboarded: true, rank: RANKS[0], xp, stats, paths: [], voidHabits: [], habitHistory: {}, dailyNotes: {}, missions: [], promotionExam: null, sideMissions: [], journal: [], lore: [], unlockedCodexEntryIds: [], unlockedAchievements: [], codex: CODEX_CATEGORIES, chapterBlack: { isUnlockedToday: false, dailyTaskCompletionPercentage: 0, hasHadRandomLoreDropToday: false }, resonanceSignature: { type: ResonanceType.Unawakened, tier: 1, rankBand: 'E-D', awakened: false, description: "Your core potential is yet to be unlocked.", auraManifestation: "A faint, colorless hum.", traits: [], signatureAbility: "N/A", domain: "N/A", statAffinities: [] }, 
+                userName: name, hasOnboarded: true, rank: calculatedRank, xp, stats, paths: [], voidHabits: [], habitHistory: {}, weeklyTaskHistory: {}, dailyNotes: {}, missions: [], promotionExam: null, sideMissions: [], journal: [], lore: [], unlockedCodexEntryIds: [], unlockedAchievements: [], codex: CODEX_CATEGORIES, chapterBlack: { isUnlockedToday: false, dailyTaskCompletionPercentage: 0, hasHadRandomLoreDropToday: false }, resonanceSignature: { type: ResonanceType.Unawakened, tier: 1, rankBand: 'E-D', awakened: false, description: "Your core potential is yet to be unlocked.", auraManifestation: "A faint, colorless hum.", traits: [], signatureAbility: "N/A", domain: "N/A", statAffinities: [] }, 
                 resonanceVector: resonanceVector || undefined, 
-                statHistory: [{ date: new Date().toISOString(), stats: stats.reduce((acc, s) => ({...acc, [s.name]: s.value}), {} as Record<StatName, number>) }], chatSessions: [], weeklyPlan: {}, forsaken: { stats: initialForsakenStats, baseStats: initialForsakenStats.map(s => ({...s})), dailyCompletionTarget: 0.8, focusStat: StatName.Physical }, currentStreak: 0, longestStreak: 0, dailyXpGain: 0, totalTasksCompleted: 0, isTourActive: true, tourStep: 0, specialEvent: null, calibrationAnalysis, initialStatsSnapshot: initialStatsSnapshot || stats, notificationPermission: 'default', talentDna, archetypeTitle: talentArchetype, biometrics, logs: [], benchmarks: {}, 
+                statHistory: [{ date: new Date().toISOString(), stats: stats.reduce((acc, s) => ({...acc, [s.name]: s.value}), {} as Record<StatName, number>) }], chatSessions: [], weeklyPlan: {}, forsaken: { stats: initialForsakenStats, baseStats: initialForsakenStats.map(s => ({...s})), dailyCompletionTarget: 0.8, focusStat: StatName.Physical }, currentStreak: 0, longestStreak: 0, dailyXpGain: 0, totalTasksCompleted: 0, isTourActive: true, tourStep: 0, specialEvent: null, calibrationAnalysis, initialStatsSnapshot: initialStatsSnapshot || stats, notificationPermission: 'default', talentDna, archetypeTitle: talentArchetype, biometrics, logs: [], benchmarks: {}, benchmarkMetrics: [], statProgressionHistory: [],
                 dailyMetrics: { waterIntake: 0, steps: 0, calories: 0, protein: 0, carbs: 0, fats: 0, sleepScore: 0, sleepHours: 0, weightKg: 0, immersionHours: 0 },
-                totalImmersionHours: 0
+                totalImmersionHours: 0,
+                waterGoal: 2000, // Default 2L water goal
+                stepGoal: 10000, // Default 10k step goal
+                waterGoalReachedToday: false,
+                stepGoalReachedToday: false,
+                protocolMetrics: [], // Track protocol completions
+                protocolHistory: [], // Daily protocol log
+                metricsHistory: [], // Water/step history
             };
             dispatch({ type: 'SET_STATE', payload: newState });
         },
@@ -211,6 +292,7 @@ export const GameStateProvider: React.FC<{ children: React.ReactNode; notify: (m
         addToast: (m, t) => notify ? notify(m, t) : console.log(m),
         addLog: (m, t) => dispatch({ type: 'ADD_LOG', payload: { id: Date.now().toString(), timestamp: new Date().toISOString(), type: t, message: m } }),
         completeTask: (p, t, e) => dispatch({ type: 'COMPLETE_TASK', payload: { pathId: p, taskId: t, evaluation: e } }),
+        incrementWeeklyTask: (p, t) => dispatch({ type: 'INCREMENT_WEEKLY_TASK', payload: { pathId: p, taskId: t } }),
         toggleHistoricalHabit: (d, h, s) => dispatch({ type: 'TOGGLE_HISTORICAL_HABIT', payload: { date: d, habitId: h, status: s } }),
         setDailyNote: (date, note) => dispatch({ type: 'SET_DAILY_NOTE', payload: { date, note } }),
         addVoidHabit: (h) => dispatch({ type: 'ADD_VOID_HABIT', payload: h }),
@@ -255,6 +337,12 @@ export const GameStateProvider: React.FC<{ children: React.ReactNode; notify: (m
         setNotificationPermission: (p) => dispatch({ type: 'SET_NOTIFICATION_PERMISSION', payload: p }),
         dismissSpecialEvent: () => dispatch({ type: 'DISMISS_SPECIAL_EVENT' }),
         updateDailyMetrics: (m) => dispatch({ type: 'UPDATE_DAILY_METRICS', payload: m }),
+        setWaterGoal: (goal) => dispatch({ type: 'SET_WATER_GOAL', payload: goal }),
+        setStepGoal: (goal) => dispatch({ type: 'SET_STEP_GOAL', payload: goal }),
+        editTask: (pid, tid, updates) => dispatch({ type: 'EDIT_TASK', payload: { pathId: pid, taskId: tid, updates } }),
+        reorderTasks: (pid, taskIds) => dispatch({ type: 'REORDER_TASKS', payload: { pathId: pid, taskIds } }),
+        snoozeTask: (pid, tid, until) => dispatch({ type: 'SNOOZE_TASK', payload: { pathId: pid, taskId: tid, until } }),
+        unsnoozeTask: (pid, tid) => dispatch({ type: 'UNSNOOZE_TASK', payload: { pathId: pid, taskId: tid } }),
     };
 
     return <GameStateContext.Provider value={contextValue}>{children}</GameStateContext.Provider>;

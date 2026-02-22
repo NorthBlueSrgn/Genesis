@@ -8,7 +8,7 @@ import { JournalEntry } from '../types';
 const ArchiveVolume: React.FC<{ title: string; children: React.ReactNode; defaultOpen?: boolean }> = ({ title, children, defaultOpen = false }) => {
     const [isOpen, setIsOpen] = useState(defaultOpen);
     return (
-        <div className="mb-4 border border-purple-900/20 bg-black/20 overflow-hidden rounded-sm">
+        <div className="mb-4 border border-purple-900/20 bg-gray-900 overflow-hidden rounded-sm">
             <button 
                 onClick={() => setIsOpen(!isOpen)} 
                 className="w-full flex items-center justify-between p-4 bg-purple-900/5 hover:bg-purple-900/10 transition-colors border-b border-purple-900/10"
@@ -147,7 +147,7 @@ const JournalPage: React.FC = () => {
                         </h1>
                     </div>
 
-                    <div className="flex items-center gap-2 bg-black/40 p-1 border border-purple-900/40 rounded-sm shadow-xl">
+                    <div className="flex items-center gap-2 bg-gray-800 p-1 border border-purple-900/40 rounded-sm shadow-xl">
                         <button 
                             onClick={() => setActiveTab('ledger')}
                             className={`flex items-center gap-2 px-6 py-2 text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'ledger' ? 'bg-purple-600 text-white shadow-[0_0_20px_rgba(168,85,247,0.4)]' : 'text-gray-500 hover:text-gray-300'}`}
@@ -334,7 +334,7 @@ const JournalPage: React.FC = () => {
                                 <div className="flex items-center gap-3 text-green-500/50 text-[10px] font-black uppercase tracking-widest"><ShieldCheck size={14} /> Encryption_Active_B256</div>
                             </div>
                             
-                            <div className="bg-black/60 border border-purple-900/30 p-10 rounded-sm space-y-12 relative overflow-hidden hud-card">
+                            <div className="bg-gray-700 border border-purple-900/30 p-10 rounded-sm space-y-12 relative overflow-hidden hud-card">
                                 <div className="absolute top-0 right-0 p-4 opacity-[0.03] pointer-events-none rotate-12"><BrainCircuit size={400} /></div>
                                 
                                 <div className="space-y-4 relative z-10">
@@ -358,7 +358,7 @@ const JournalPage: React.FC = () => {
                     ) : (
                         <div className="space-y-8 animate-in fade-in">
                             <div className="flex justify-between items-center gap-4">
-                                <div className="flex-grow flex items-center bg-black/60 border border-purple-900/30 p-3 rounded-sm shadow-inner">
+                                <div className="flex-grow flex items-center bg-gray-700 border border-purple-900/30 p-3 rounded-sm shadow-inner">
                                     <Search className="text-purple-600 mr-4" size={18} />
                                     <input type="text" placeholder="FILTER_NEURAL_VOLUMES..." className="bg-transparent w-full text-white font-mono text-sm outline-none placeholder:text-gray-700 tracking-widest" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
                                 </div>

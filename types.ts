@@ -1,4 +1,3 @@
-
 // types.ts
 
 import React from 'react';
@@ -60,9 +59,13 @@ export enum AttributeRankName {
 
 export enum ProficiencyLevel {
     Novice = 'Novice',
+    NovicePlus = 'Novice+',
     Intermediate = 'Intermediate',
+    IntermediatePlus = 'Intermediate+',
     Advanced = 'Advanced',
-    Master = 'Master'
+    AdvancedPlus = 'Advanced+',
+    Master = 'Master',
+    MasterPlus = 'Master+'
 }
 
 export enum TaskType {
@@ -95,6 +98,17 @@ export enum AchievementRarity {
     Rare = 'Rare',
     Epic = 'Epic',
     Legendary = 'Legendary',
+}
+
+export enum AchievementCategory {
+    Protocol = 'Protocol',
+    Stats = 'Stats',
+    Streaks = 'Streaks',
+    XP = 'XP',
+    Mastery = 'Mastery',
+    Exploration = 'Exploration',
+    Special = 'Special',
+    Legacy = 'Legacy'
 }
 
 export type ToastType = 'success' | 'error' | 'info' | 'special';
@@ -155,6 +169,14 @@ export interface Task {
   isCompleted: boolean;
   lastCompleted?: string;
   isNonNegotiable?: boolean;
+  // NEW: For weekly counter-based tasks (e.g., "Gym 4x/week")
+  targetCount?: number; // How many times to complete this week (e.g., 4)
+  currentCount?: number; // How many times completed so far this week (e.g., 2)
+  // Task management features
+  notes?: string; // Optional notes/details about the task
+  order?: number; // Order in the list (for drag-and-drop reordering)
+  isSnoozed?: boolean; // Temporarily paused
+  snoozedUntil?: string; // Date when snooze ends
 }
 
 export interface Path {
@@ -308,6 +330,8 @@ export interface UnlockedAchievement {
     id: string;
     highestTier: number;
     unlockedAt: string;
+    progress?: number; // Current progress towards next tier
+    nextTierTarget?: number; // Target for next tier
 }
 
 export interface AchievementTier {
@@ -316,13 +340,19 @@ export interface AchievementTier {
     description: string;
     rarity: AchievementRarity;
     icon: IconName;
+    title?: string; // Optional title unlock (e.g., "The Unstoppable")
+    badge?: string; // Optional badge emoji
 }
 
 export interface Achievement {
     id: string;
     name: string;
+    category: AchievementCategory;
+    description: string;
     isSecret?: boolean;
     tiers: AchievementTier[];
+    trackingField?: string; // Field in GameState to track (e.g., 'totalTasksCompleted')
+    customCheck?: (gameState: GameState) => number; // Custom progress calculation
 }
 
 export interface TalentDna {
@@ -370,6 +400,8 @@ export interface FullCalibrationReport extends TraitAnalysisResult {
     initialStatsSnapshot: Stat[];
     estimatedCeilingRank: AttributeRankName;
     talentDna: TalentDna;
+    hati?: number; // Human Apex Threat Index (0-100)
+    baselineAdjusted?: boolean; // True if HATI was boosted to B-rank baseline
     primaryFailureNode: string;
     failureNodeRisk: string;
     successProbability: number;
@@ -444,6 +476,44 @@ export interface DailyMetrics {
     immersionHours: number; // Daily immersion log
 }
 
+// Protocol Tracking System
+export interface ProtocolMetrics {
+    protocolId: string;
+    protocolName: string;
+    category: string;
+    totalCompletions: number;
+    currentStreak: number;
+    bestStreak: number;
+    completionRate: number; // Percentage over last 30 days
+    lastCompleted?: string;
+    weeklyCompletions: number[]; // Last 8 weeks
+    firstCompleted?: string;
+}
+
+export interface ProtocolHistory {
+    date: string; // ISO date string
+    protocolsCompleted: {
+        protocolId: string;
+        protocolName: string;
+        xp: number;
+        statBoost: {
+            stat: StatName;
+            subStat: SubStatName;
+            amount: number;
+        };
+    }[];
+    totalXp: number;
+    dailyCompletionCount: number;
+}
+
+export interface MetricsHistory {
+    date: string;
+    waterIntake: number;
+    steps: number;
+    waterGoalReached: boolean;
+    stepGoalReached: boolean;
+}
+
 export interface LabyrinthSubtest {
     id: string;
     title: string;
@@ -468,6 +538,28 @@ export interface HabitHistoryRecord {
     }
 }
 
+export interface WeeklyTaskHistoryRecord {
+    [weekKey: string]: { // Format: "2026-W05" (ISO week format)
+        [taskId: string]: boolean; // true = completed this week
+    }
+}
+
+/**
+ * Alignment System: Lawful-Chaotic and Good-Evil axes
+ * Each axis ranges from -100 to 100
+ * - Lawful-Chaotic: -100 (Lawful) to 100 (Chaotic)
+ * - Good-Evil: -100 (Good) to 100 (Evil)
+ * 
+ * Impacts on Spirit and Psyche substats:
+ * - Faith/Purpose (Spirit): Influenced by Good-Evil alignment
+ * - Willpower/Focus (Psyche): Influenced by Lawful-Chaotic alignment
+ */
+export interface AlignmentScores {
+    lawfulChaotic: number; // -100 (Lawful) to 100 (Chaotic)
+    goodEvil: number; // -100 (Good) to 100 (Evil)
+    profile: string; // e.g., "Lawful Good", "Neutral Evil", "Chaotic Neutral"
+}
+
 export interface GameState {
     userName: string;
     hasOnboarded: boolean;
@@ -478,6 +570,7 @@ export interface GameState {
     paths: Path[];
     voidHabits: VoidHabit[];
     habitHistory: HabitHistoryRecord;
+    weeklyTaskHistory: WeeklyTaskHistoryRecord; // NEW: Track weekly tasks separately
     dailyNotes: Record<string, string>; // 1-sentence highlights for the Ledger
     missions: Mission[];
     promotionExam: PromotionExam | null;
@@ -511,9 +604,23 @@ export interface GameState {
     archetypeTitle?: string;
     biometrics?: any;
     logs: LogEntry[];
+    // NEW: minimal ledger for protocol breaches keyed by date
+    protocolBreachHistory?: Record<string, ProtocolBreachDaySummary>;
+    // Optional light-weight daily snapshot for CENTRAL / dashboard teaching moments
+    dailySystemsSummaries?: DailySystemsSummary[];
     benchmarks: Record<string, number>;
+    benchmarkMetrics: BenchmarkMetric[];
+    statProgressionHistory: StatProgression[];
     dailyMetrics: DailyMetrics;
     totalImmersionHours: number; // Cumulative for Dreaming Spanish level tracking
+    waterGoal: number; // Daily water intake goal in ml (e.g., 2000)
+    stepGoal: number; // Daily step goal (e.g., 10000)
+    waterGoalReachedToday: boolean; // Whether today's water goal was reached
+    stepGoalReachedToday: boolean; // Whether today's step goal was reached
+    protocolMetrics: ProtocolMetrics[]; // Track all protocol completion data
+    protocolHistory: ProtocolHistory[]; // Daily protocol completion log
+    metricsHistory: MetricsHistory[]; // Water/step daily history
+    alignment?: AlignmentScores; // New: Alignment system for stat modifiers
 }
 
 export interface PresetProtocol {
@@ -567,6 +674,32 @@ export interface CalibrationBenchmark {
     questions?: any[];
 }
 
+export interface BenchmarkMetric {
+    id: string;
+    name: string;
+    stat: StatName;
+    subStat: SubStatName;
+    unit: string;
+    currentValue: number;
+    personalRecord: number;
+    targetValue: number;
+    lastMeasured: string;
+    history: Array<{ date: string; value: number }>;
+}
+
+export interface StatProgression {
+    metricId: string;
+    metricName: string;
+    stat: StatName;
+    subStat: SubStatName;
+    previousValue: number;
+    newValue: number;
+    improvement: number;
+    statBoostAwarded: number;
+    percentile: number;
+    timestamp: string;
+}
+
 export interface Hobby {
     name: string;
     category: string;
@@ -577,7 +710,9 @@ export interface Hobby {
 export type GameAction =
   | { type: 'SET_STATE'; payload: GameState }
   | { type: 'COMPLETE_TASK'; payload: { pathId: string; taskId: string; evaluation?: EvaluationResult } }
+  | { type: 'INCREMENT_WEEKLY_TASK'; payload: { pathId: string; taskId: string } } // NEW: Increment weekly task counter
   | { type: 'DAILY_RESET' }
+  | { type: 'WEEKLY_RESET' } // NEW: Reset weekly tasks every Sunday at 04:00
   | { type: 'ADD_PATH'; payload: Path }
   | { type: 'DELETE_PATH'; payload: string }
   | { type: 'UPDATE_PATH'; payload: { pathId: string; updates: Partial<Path> } }
@@ -585,6 +720,10 @@ export type GameAction =
   | { type: 'ADD_TASK_TO_PATH'; payload: { pathId: string; task: Task } }
   | { type: 'UPDATE_TASKS_FOR_PATH'; payload: { pathId: string; tasks: Task[] } }
   | { type: 'DELETE_TASK_FROM_PATH'; payload: { pathId: string; taskId: string } }
+  | { type: 'EDIT_TASK'; payload: { pathId: string; taskId: string; updates: Partial<Task> } }
+  | { type: 'REORDER_TASKS'; payload: { pathId: string; taskIds: string[] } }
+  | { type: 'SNOOZE_TASK'; payload: { pathId: string; taskId: string; until?: string } }
+  | { type: 'UNSNOOZE_TASK'; payload: { pathId: string; taskId: string } }
   | { type: 'TOGGLE_HISTORICAL_HABIT'; payload: { date: string; habitId: string; status: boolean | 'breach' } }
   | { type: 'SET_DAILY_NOTE'; payload: { date: string; note: string } }
   | { type: 'ADD_VOID_HABIT'; payload: VoidHabit }
@@ -621,4 +760,21 @@ export type GameAction =
   | { type: 'DISMISS_SPECIAL_EVENT' }
   | { type: 'SET_NOTIFICATION_PERMISSION'; payload: 'default' | 'granted' | 'denied' }
   | { type: 'ADD_LOG'; payload: LogEntry }
-  | { type: 'UPDATE_DAILY_METRICS'; payload: Partial<DailyMetrics> };
+  | { type: 'UPDATE_DAILY_METRICS'; payload: Partial<DailyMetrics> }
+  | { type: 'SET_WATER_GOAL'; payload: number }
+  | { type: 'SET_STEP_GOAL'; payload: number }
+  | { type: 'RECORD_BENCHMARK'; payload: StatProgression }
+  | { type: 'INCREMENT_WEEKLY_TASK'; payload: { pathId: string; taskId: string } };
+
+export interface ProtocolBreachDaySummary {
+  count: number;
+  lastUpdated: string;
+}
+
+export interface DailySystemsSummary {
+  date: string; // ISO date (YYYY-MM-DD)
+  bedrockSecured: number;
+  bedrockTotal: number;
+  weeklyBehind: number;
+  loadLabel?: string;
+}

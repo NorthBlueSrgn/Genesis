@@ -31,7 +31,7 @@ const DiaryArchivePage: React.FC = () => {
                 <p className="hud-text-accent uppercase text-xs mt-2">Chronological Telemetry History</p>
             </div>
 
-            <Card className="!border-purple-500/20 bg-black/40">
+            <Card className="!border-purple-500/20 bg-gray-800">
                 <div className="flex items-center gap-4 p-2">
                     <Search className="text-gray-500" />
                     <input 
@@ -71,7 +71,7 @@ const DiaryArchivePage: React.FC = () => {
             </div>
 
             {selectedEntry && (
-                <div className="fixed inset-0 z-[1000] bg-black/90 flex items-center justify-center p-4 md:p-10">
+                <div className="fixed inset-0 z-[1000] bg-gray-800 flex items-center justify-center p-4 md:p-10">
                     <div className="w-full max-w-3xl bg-[#fdf6e3] border-4 border-black p-8 md:p-12 shadow-[30px_30px_0px_rgba(168,85,247,0.2)] relative">
                         <div className="absolute inset-0 pointer-events-none paper-texture z-0 opacity-30 mix-blend-multiply" />
                         <div className="relative z-10">

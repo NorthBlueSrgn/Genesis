@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useEffect } from 'react';
 import { useGameState } from '../contexts/GameStateContext';
 import Loader from '../components/ui/Loader';
@@ -166,10 +165,10 @@ const PlannerPage: React.FC = () => {
   }
 
   return (
-    <div className="flex flex-col md:flex-row h-[calc(100vh-5rem)] md:h-[calc(100vh-3rem)] gap-6 p-2 md:p-6">
+    <div className="flex flex-col md:flex-row h-[calc(100vh-5rem)] md:h-[calc(100vh-3rem)] gap-6 p-2 md:p-6 bg-gradient-to-br from-black via-[#050812] to-black">
       {/* Available Tasks Sidebar */}
       <div className="w-full md:w-1/3 lg:w-1/4 flex flex-col min-h-0">
-        <Card className="flex-grow flex flex-col h-full !bg-black/60 border-purple-900/30">
+        <Card className="flex-grow flex flex-col h-full !bg-black/85 border-purple-900/50 shadow-[0_0_28px_rgba(168,85,247,0.35)]">
           <div className="mb-4">
             <h2 className="text-xl font-black font-orbitron text-purple-400 tracking-widest uppercase">Directives</h2>
             <p className="text-[10px] text-gray-600 font-mono mt-1">AVAILABLE_FOR_PLANNING</p>
@@ -200,7 +199,7 @@ const PlannerPage: React.FC = () => {
 
       {/* Planner Main Area */}
       <div className="w-full md:w-2/3 lg:w-3/4 flex flex-col min-h-0">
-        <Card className="flex-shrink-0 mb-4 !bg-black/40 border-cyan-900/20">
+        <Card className="flex-shrink-0 mb-4 !bg-black/90 border-cyan-900/60 shadow-[0_0_32px_rgba(34,211,238,0.35)]">
             <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
                 <div>
                     <h1 className="text-3xl font-black font-orbitron text-white tracking-tighter">TACTICAL_PLANNER</h1>
@@ -217,7 +216,7 @@ const PlannerPage: React.FC = () => {
             </div>
         </Card>
 
-        <div className="flex-grow overflow-y-auto custom-scrollbar bg-black/20 border border-gray-800/50 rounded-sm">
+        <div className="flex-grow overflow-y-auto custom-scrollbar bg-black/80 border border-gray-800/70 rounded-sm shadow-[0_0_30px_rgba(15,23,42,0.9)]">
           <div className="p-4 md:p-6 min-h-full">
             <div className="flex justify-between items-center mb-8 bg-gray-900/40 p-2 border border-gray-800 rounded-sm">
               {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day, i) => (
@@ -252,7 +251,7 @@ const PlannerPage: React.FC = () => {
                     
                     <div className="flex-grow flex flex-col gap-2 py-1">
                       {tasksInSlot.length > 0 ? (
-                        tasksInSlot.map(task => <ScheduledTask key={task.id} task={task} />)
+                        tasksInSlot.map((task: PlannerTask) => <ScheduledTask key={task.id} task={task} />)
                       ) : (
                         <div className={`flex-grow w-full border border-dashed rounded-sm flex items-center justify-center transition-opacity duration-500 ${isActiveSlot ? 'border-purple-500/50 opacity-100' : 'border-gray-800/20 opacity-10'}`}>
                            <span className="text-[9px] font-black font-mono tracking-[0.5em] text-gray-500 uppercase">_OPEN_WINDOW</span>

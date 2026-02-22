@@ -43,8 +43,8 @@ const BriefingScreen: React.FC<{ title: string; desc: string; onStart: () => voi
         </div>
         <div className="space-y-3">
             <h2 className="text-xl font-black font-orbitron text-white tracking-widest">{title.toUpperCase()}</h2>
-            <div className="bg-gray-900/40 p-4 border border-gray-800 rounded-sm max-w-md mx-auto">
-                <p className="text-gray-400 text-xs leading-relaxed font-mono italic">"{desc}"</p>
+            <div className="bg-gray-900 p-4 border border-gray-700 rounded-sm max-w-md mx-auto">
+                <p className="text-gray-300 text-xs leading-relaxed font-mono italic">"{desc}"</p>
             </div>
         </div>
         <button onClick={onStart} className="w-full max-w-xs bg-purple-600 hover:bg-purple-500 text-white font-black font-orbitron py-4 tracking-[0.3em] rounded-sm transition-all shadow-[0_0_20px_rgba(168,85,247,0.3)]">
@@ -175,12 +175,12 @@ const LogicEngine: React.FC<{ test: LabyrinthSubtest, onComplete: (score: number
                 </div>
             </div>
             
-            <div className="grid grid-cols-4 gap-2 mb-8 bg-black/40 p-4 border border-gray-800 rounded-sm shadow-[0_0_50px_rgba(0,0,0,1)] relative group">
+            <div className="grid grid-cols-4 gap-2 mb-8 bg-gray-900 p-4 border border-gray-700 rounded-sm shadow-[0_0_50px_rgba(0,0,0,1)] relative group">
                 {grid.map((active, i) => (
                     <button 
                         key={i} 
                         onClick={() => handleCellClick(i)}
-                        className={`w-14 h-14 rounded-sm border transition-all duration-300 ${active ? 'bg-cyan-600 shadow-[0_0_15px_rgba(6,182,212,0.5)] border-white' : 'bg-gray-900 border-gray-800 hover:border-purple-500/30'}`}
+                        className={`w-14 h-14 rounded-sm border transition-all duration-300 ${active ? 'bg-cyan-600 shadow-[0_0_15px_rgba(6,182,212,0.5)] border-white' : 'bg-gray-800 border-gray-700 hover:border-purple-500/30'}`}
                     />
                 ))}
             </div>
@@ -467,7 +467,7 @@ const SniperEngine: React.FC<{ test: LabyrinthSubtest, onComplete: (score: numbe
                 <p className="text-[10px] text-white font-black uppercase tracking-[0.3em] flex items-center gap-2">
                     <TargetIcon size={12} className={isOverdrive ? 'text-red-500' : 'text-purple-500'} /> NEURAL_LINK READY
                 </p>
-                <div className="w-full bg-gray-900 h-1.5 rounded-full max-w-xs overflow-hidden border border-gray-800">
+                <div className="w-full bg-gray-800 h-1.5 rounded-full max-w-xs overflow-hidden border border-gray-700">
                     <div className={`h-full transition-all duration-300 ${isOverdrive ? 'bg-red-600 shadow-[0_0_10px_red]' : 'bg-purple-600 shadow-[0_0_10px_#a855f7]'}`} style={{width: `${(round/TOTAL_ROUNDS)*100}%`}} />
                 </div>
             </div>

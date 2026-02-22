@@ -69,6 +69,9 @@ export interface CalibrationAnalysis {
   
   hati: number; // Human Apex Threat Index (0-100)
   hatiBreakdown: {
+    baseStats?: number;
+    missionXP?: number;
+    bonuses?: number;
     physical: number;
     vitality: number;
     intelligence: number;
@@ -76,11 +79,13 @@ export interface CalibrationAnalysis {
     spirit: number;
     psyche: number;
   };
+  baselineAdjusted?: boolean; // True if HATI was boosted to B-rank baseline
   
   synergies: {
     name: string;
     multiplier: number;
     substats: string[];
+    bonus?: number;
   }[];
   
   strengths: string[];
@@ -102,7 +107,7 @@ export interface CalibrationAnalysis {
  * - Consistency across vectors indicates deep talent
  * - Non-linear scaling emphasizes outliers
  */
-function calculateTalentClass(substats: SubstatPercentiles): { score: number; talentClass: string; confidence: number } {
+function calculateTalentClass(substats: SubstatPercentiles): { score: number; talentClass: 'Laggard' | 'Average' | 'Talented Learner' | 'Gifted' | 'Genius'; confidence: number } {
   // Physical Competency Vector (6 substats)
   const physicalSubstats = [
     substats[SubStatName.Strength] || 0,
@@ -147,7 +152,7 @@ function calculateTalentClass(substats: SubstatPercentiles): { score: number; ta
 
   // Determine talent class based on percentile distribution
   // Population frequencies: Laggard 20%, Average 65%, Talented 10%, Gifted 4.9%, Genius 0.1%
-  let talentClass = 'Average';
+  let talentClass: 'Laggard' | 'Average' | 'Talented Learner' | 'Gifted' | 'Genius' = 'Average';
   let confidence = 0.5;
 
   if (talentScore >= 94) {
@@ -189,7 +194,7 @@ function calculateTalentClass(substats: SubstatPercentiles): { score: number; ta
  * - High Focus + Composure indicates discipline
  * - Synergy between psyche and spirit indicates deeper obsession
  */
-function calculateObsessionLevel(substats: SubstatPercentiles): { score: number; obsessionLevel: string; confidence: number } {
+function calculateObsessionLevel(substats: SubstatPercentiles): { score: number; obsessionLevel: 'Lazy' | 'Average' | 'Locked-In' | 'Relentless' | 'Compulsive'; confidence: number } {
   // Psyche Vector: Inner Drive and Mental Fortitude (5 substats)
   const psycheSubstats = [
     substats[SubStatName.Resilience] || 0,     // Recovery from setbacks
@@ -227,7 +232,7 @@ function calculateObsessionLevel(substats: SubstatPercentiles): { score: number;
 
   // Determine obsession level based on population distribution
   // Population frequencies: Lazy ~20%, Average ~50%, Locked-In ~20%, Relentless ~8%, Compulsive ~2%
-  let obsessionLevel = 'Average';
+  let obsessionLevel: 'Lazy' | 'Average' | 'Locked-In' | 'Relentless' | 'Compulsive' = 'Average';
   let confidence = 0.5;
 
   if (obsessionScore >= 90) {
@@ -258,19 +263,35 @@ function calculateObsessionLevel(substats: SubstatPercentiles): { score: number;
 /**
  * HATI (HUMAN APEX THREAT INDEX) CALCULATION
  * 
- * Holistic threat assessment combining all 30 substats:
- * - Physical (6): Direct capability threat
- * - Vitality (5): Sustainability and resilience
- * - Intelligence (5): Analytical threat
- * - Creativity (5): Innovation and adaptation threat
- * - Spirit (2): Conviction and purpose
- * - Psyche (2): Will and mental fortitude
+ * Solo Leveling-inspired progression system combining:
+ * - Base Stats (40%): Weighted average of all 30 substats
+ * - Mission XP (40%): Accumulated experience from completed tasks/missions
+ * - Bonuses (20%): Synergies, achievements, special conditions
  * 
- * Non-linear scaling emphasizes outliers (>80th percentile)
- * Synergy multipliers for aligned strong vectors
+ * BASELINE: New users start at B-rank floor (60%) - "Hunter Awakening"
+ * 
+ * RANK THRESHOLDS (Percentile-Based):
+ * - E: 0-19%   "Dormant"
+ * - D: 20-39%  "Stirring" 
+ * - C: 40-59%  "Awakening"
+ * - B: 60-74%  "Elite Hunter" (Starting rank for new users)
+ * - A: 75-89%  "S-Class Hunter"
+ * - S: 90-96%  "National Level"
+ * - SS: 97-99.8% "Monarch Candidate"
+ * - SS+: 99.9%+ "Shadow Monarch"
+ * 
+ * PROGRESSION TIMELINE (Realistic):
+ * - B→A: 2-3 months (consistent daily engagement)
+ * - A→S: 4-6 months (specialized training + missions)
+ * - S→SS: 6-12 months (elite performance + rare achievements)
+ * - SS→SS+: Reserved for top 0.1% (12+ months sustained excellence)
  */
-function calculateHATI(substats: SubstatPercentiles): { hati: number; breakdown: Record<string, number>; synergies: any[] } {
-  // Physical Vector Threat (6 substats)
+function calculateHATI(substats: SubstatPercentiles, missionXP: number = 0, achievementBonuses: number = 0): { hati: number; breakdown: Record<string, number>; synergies: any[]; baselineAdjusted: boolean } {
+  // ===========================
+  // PART 1: BASE STATS (40%)
+  // ===========================
+  
+  // Physical Vector (6 substats) - Weight: 15%
   const physical = [
     substats[SubStatName.Strength] || 0,
     substats[SubStatName.Speed] || 0,
@@ -279,19 +300,19 @@ function calculateHATI(substats: SubstatPercentiles): { hati: number; breakdown:
     substats[SubStatName.Agility] || 0,
     substats[SubStatName.Stamina] || 0,
   ];
-  const physicalThreat = (physical.reduce((a, b) => a + b, 0) / 6) * 0.15;
+  const physicalAvg = physical.reduce((a, b) => a + b, 0) / 6;
 
-  // Vitality Vector (5 substats)
+  // Vitality Vector (5 substats) - Weight: 12%
   const vitality = [
     substats[SubStatName.Balance] || 0,
     substats[SubStatName.Adherence] || 0,
     substats[SubStatName.Longevity] || 0,
     substats[SubStatName.Regeneration] || 0,
-    substats[SubStatName.Stamina] || 0, // Shared with Physical
+    substats[SubStatName.Stamina] || 0,
   ];
-  const vitalityThreat = (vitality.reduce((a, b) => a + b, 0) / 5) * 0.15;
+  const vitalityAvg = vitality.reduce((a, b) => a + b, 0) / 5;
 
-  // Intelligence Vector Threat (5 substats)
+  // Intelligence Vector (5 substats) - Weight: 20%
   const intelligence = [
     substats[SubStatName.Reason] || 0,
     substats[SubStatName.Knowledge] || 0,
@@ -299,9 +320,9 @@ function calculateHATI(substats: SubstatPercentiles): { hati: number; breakdown:
     substats[SubStatName.Strategy] || 0,
     substats[SubStatName.Perception] || 0,
   ];
-  const intelligenceThreat = (intelligence.reduce((a, b) => a + b, 0) / 5) * 0.2;
+  const intelligenceAvg = intelligence.reduce((a, b) => a + b, 0) / 5;
 
-  // Creativity Vector Threat (5 substats)
+  // Creativity Vector (5 substats) - Weight: 18%
   const creativity = [
     substats[SubStatName.Imagination] || 0,
     substats[SubStatName.Innovation] || 0,
@@ -309,84 +330,115 @@ function calculateHATI(substats: SubstatPercentiles): { hati: number; breakdown:
     substats[SubStatName.Expression] || 0,
     substats[SubStatName.Vision] || 0,
   ];
-  const creativityThreat = (creativity.reduce((a, b) => a + b, 0) / 5) * 0.2;
+  const creativityAvg = creativity.reduce((a, b) => a + b, 0) / 5;
 
-  // Spirit Vector Threat (2 key substats)
-  const spiritThreat = ((substats[SubStatName.Faith] || 0) * 0.6 + (substats[SubStatName.Purpose] || 0) * 0.4) * 0.15;
+  // Spirit Vector (2 substats) - Weight: 15%
+  const spiritAvg = (substats[SubStatName.Faith] || 0) * 0.6 + (substats[SubStatName.Purpose] || 0) * 0.4;
 
-  // Psyche Vector Threat (2 key substats)
-  const psycheThreat = ((substats[SubStatName.Willpower] || 0) * 0.6 + (substats[SubStatName.Resilience] || 0) * 0.4) * 0.15;
+  // Psyche Vector (2 substats) - Weight: 20%
+  const psycheAvg = (substats[SubStatName.Willpower] || 0) * 0.6 + (substats[SubStatName.Resilience] || 0) * 0.4;
 
-  // Base HATI
-  let hati = physicalThreat + vitalityThreat + intelligenceThreat + creativityThreat + spiritThreat + psycheThreat;
-  hati = Math.min(100, hati);
+  // Weighted Base Stats Score (0-100)
+  const baseStatsScore = (
+    physicalAvg * 0.15 +
+    vitalityAvg * 0.12 +
+    intelligenceAvg * 0.20 +
+    creativityAvg * 0.18 +
+    spiritAvg * 0.15 +
+    psycheAvg * 0.20
+  );
 
-  // Detect synergies
+  // ===========================
+  // PART 2: MISSION XP (40%)
+  // ===========================
+  // Mission XP converts to percentile (0-100)
+  // Scaling: 1000 XP = 10 percentile points
+  // Expected: ~100 XP/day = 30% gain over 3 months
+  const missionXPScore = Math.min(100, missionXP / 10);
+
+  // ===========================
+  // PART 3: BONUSES (20%)
+  // ===========================
+  let bonusScore = 0;
   const synergies = [];
 
-  // Synergy 1: Physical + Intelligence (Strategic Physical)
+  // Synergy 1: Strategic Athlete (Physical 80+ & Intelligence 80+)
   if (physical.some(p => p > 80) && intelligence.some(i => i > 80)) {
-    const bonus = 5;
-    hati += bonus;
+    bonusScore += 3;
     synergies.push({
       name: 'Strategic Athlete',
       multiplier: 1.15,
       substats: ['Strength/Speed', 'Strategy/Perception'],
+      bonus: 3
     });
   }
 
-  // Synergy 2: Creativity + Intelligence (Innovative Thinker)
+  // Synergy 2: Visionary Technologist (Creativity 80+ & Intelligence 80+)
   if (creativity.some(c => c > 80) && intelligence.some(i => i > 80)) {
-    const bonus = 7;
-    hati += bonus;
+    bonusScore += 4;
     synergies.push({
       name: 'Visionary Technologist',
       multiplier: 1.25,
       substats: ['Innovation/Vision', 'Reason/Adaptability'],
+      bonus: 4
     });
   }
 
-  // Synergy 3: Psyche + Creativity (Uncompromising Artist)
+  // Synergy 3: Uncompromising Creator (Willpower 80+ & Innovation 80+)
   if ((substats[SubStatName.Willpower] || 0) > 80 && (substats[SubStatName.Innovation] || 0) > 80) {
-    const bonus = 6;
-    hati += bonus;
+    bonusScore += 3.5;
     synergies.push({
       name: 'Uncompromising Creator',
       multiplier: 1.2,
       substats: ['Willpower', 'Innovation/Expression'],
+      bonus: 3.5
     });
   }
 
-  // Synergy 4: All vectors high (Apex Threat)
-  const vectorAverages = [
-    physical.reduce((a, b) => a + b, 0) / 6,
-    vitality.reduce((a, b) => a + b, 0) / 5,
-    intelligence.reduce((a, b) => a + b, 0) / 5,
-    creativity.reduce((a, b) => a + b, 0) / 5,
-  ];
-  const allHighVectors = vectorAverages.filter(v => v > 70).length >= 3;
-  if (allHighVectors) {
-    const bonus = 8;
-    hati += bonus;
+  // Synergy 4: Apex Threat (3+ vectors at 70+)
+  const vectorAverages = [physicalAvg, vitalityAvg, intelligenceAvg, creativityAvg];
+  const highVectorCount = vectorAverages.filter(v => v > 70).length;
+  if (highVectorCount >= 3) {
+    bonusScore += 5;
     synergies.push({
       name: 'Apex Threat',
       multiplier: 1.3,
       substats: ['All vectors aligned'],
+      bonus: 5
     });
   }
 
-  hati = Math.min(100, hati);
+  // Achievement bonuses (from system)
+  bonusScore += achievementBonuses;
+  bonusScore = Math.min(20, bonusScore); // Cap at 20%
+
+  // ===========================
+  // FINAL HATI CALCULATION
+  // ===========================
+  let hati = (baseStatsScore * 0.40) + (missionXPScore * 0.40) + (bonusScore);
+  
+  // BASELINE ADJUSTMENT: Ensure new users start at B-rank floor (60%)
+  let baselineAdjusted = false;
+  if (missionXP === 0 && hati < 60) {
+    hati = 60;
+    baselineAdjusted = true;
+  }
+  
+  hati = Math.min(100, Math.max(0, hati));
 
   const breakdown = {
-    physical: physicalThreat,
-    vitality: vitalityThreat,
-    intelligence: intelligenceThreat,
-    creativity: creativityThreat,
-    spirit: spiritThreat,
-    psyche: psycheThreat,
+    baseStats: baseStatsScore * 0.40,
+    missionXP: missionXPScore * 0.40,
+    bonuses: bonusScore,
+    physical: physicalAvg,
+    vitality: vitalityAvg,
+    intelligence: intelligenceAvg,
+    creativity: creativityAvg,
+    spirit: spiritAvg,
+    psyche: psycheAvg,
   };
 
-  return { hati, breakdown, synergies };
+  return { hati, breakdown, synergies, baselineAdjusted };
 }
 
 /**
@@ -444,11 +496,11 @@ function generateVectorAnalysis(talentScore: number, obsessionScore: number, hat
 /**
  * PUBLIC API: Perform complete calibration analysis
  */
-export const performEnhancedCalibration = (substats: SubstatPercentiles): CalibrationAnalysis => {
+export const performEnhancedCalibration = (substats: SubstatPercentiles, missionXP: number = 0, achievementBonuses: number = 0): CalibrationAnalysis => {
   // Calculate all three metrics
   const { score: talentScore, talentClass, confidence: talentConfidence } = calculateTalentClass(substats);
   const { score: obsessionScore, obsessionLevel, confidence: obsessionConfidence } = calculateObsessionLevel(substats);
-  const { hati, breakdown, synergies } = calculateHATI(substats);
+  const { hati, breakdown, synergies, baselineAdjusted } = calculateHATI(substats, missionXP, achievementBonuses);
 
   // Analyze strengths and weaknesses
   const { strengths, weaknesses } = analyzeStrengthsWeaknesses(substats);
@@ -465,6 +517,7 @@ export const performEnhancedCalibration = (substats: SubstatPercentiles): Calibr
     obsessionConfidence,
     hati,
     hatiBreakdown: breakdown as any,
+    baselineAdjusted,
     synergies,
     strengths,
     weaknesses,

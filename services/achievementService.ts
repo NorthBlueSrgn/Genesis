@@ -1,53 +1,188 @@
+// services/achievementService.ts - Enhanced Achievement System
+import { GameState, UnlockedAchievement } from '../types';
+import { ACHIEVEMENTS } from '../data/enhancedAchievements';
 
-// services/achievementService.ts
-import { GameState, TaskType, AttributeRankName } from '../types';
-import { ACHIEVEMENTS_LIST } from '../data/achievementsData';
-import { RANK_MAP } from '../constants';
+/**
+ * Calculate current progress for an achievement
+ */
+export const calculateAchievementProgress = (achievementId: string, gameState: GameState): number => {
+  const achievement = ACHIEVEMENTS.find(a => a.id === achievementId);
+  if (!achievement) return 0;
 
-const calculateTotalGrowth = (state: GameState): number => {
-    if (!state.initialStatsSnapshot) return 0;
-    const currentTotal = state.stats.reduce((sum, s) => sum + s.value, 0);
-    const initialTotal = state.initialStatsSnapshot.reduce((sum, s) => sum + s.value, 0);
-    return Math.max(0, currentTotal - initialTotal);
+  // Use custom check if available
+  if (achievement.customCheck) {
+    return achievement.customCheck(gameState);
+  }
+
+  // Use tracking field if specified
+  if (achievement.trackingField) {
+    return (gameState as any)[achievement.trackingField] || 0;
+  }
+
+  return 0;
 };
 
-export const checkAchievements = (oldState: GameState, newState: GameState): { achievementId: string, newTier: number }[] => {
-    const newlyUnlocked: { achievementId: string, newTier: number }[] = [];
-    const totalGrowth = calculateTotalGrowth(newState);
-    const completedSideMissions = newState.sideMissions.filter(sm => sm.status === 'Completed').length;
+/**
+ * Check all achievements and return newly unlocked ones
+ */
+export const checkAchievements = (oldState: GameState, newState: GameState): { achievementId: string; newTier: number }[] => {
+  const newlyUnlocked: { achievementId: string; newTier: number }[] = [];
+  
+  for (const achievement of ACHIEVEMENTS) {
+    const progress = calculateAchievementProgress(achievement.id, newState);
+    const currentUnlocked = newState.unlockedAchievements.find(u => u.id === achievement.id);
+    const currentTier = currentUnlocked?.highestTier || 0;
     
-    // We only care about IDs that are NOT in the newState yet
-    const alreadyUnlockedIds = new Set(newState.unlockedAchievements.map(a => a.id));
-    const previouslyUnlockedMap = new Map(oldState.unlockedAchievements.map(a => [a.id, a.highestTier]));
-
-    for (const achievement of ACHIEVEMENTS_LIST) {
-        if (alreadyUnlockedIds.has(achievement.id)) continue;
-
-        const highestPreviousTier = previouslyUnlockedMap.get(achievement.id) || 0;
-        const nextTier = achievement.tiers.find(t => t.tier === highestPreviousTier + 1);
-        if (!nextTier) continue;
-
-        let met = false;
-        if (achievement.id === 'common-01') {
-            const done = newState.paths.flatMap(p=>p.tasks).filter(t => t.type === TaskType.Daily && t.isCompleted).length;
-            if (done >= 1) met = true;
-        }
-        if (achievement.id === 'common-02' && newState.currentStreak >= 3) met = true;
-        if (achievement.id === 'common-04' && completedSideMissions >= 1) met = true;
-        if (achievement.id === 'common-05' && totalGrowth >= 500) met = true;
-        if (achievement.id === 'common-06' && Object.values(newState.weeklyPlan).some(d => d.length > 0)) met = true;
-        if (achievement.id === 'uncommon-01' && newState.currentStreak >= 7) met = true;
-        if (achievement.id === 'uncommon-03' && completedSideMissions >= 5) met = true;
-        if (achievement.id === 'uncommon-04' && totalGrowth >= 5000) met = true;
-        if (achievement.id === 'rare-01' && newState.currentStreak >= 30) met = true;
-        if (achievement.id === 'special-07' && newState.stats.every(s => RANK_MAP[s.rank] >= RANK_MAP[AttributeRankName.C])) met = true;
-
-        if (met) newlyUnlocked.push({ achievementId: achievement.id, newTier: nextTier.tier });
+    // Check if we can unlock the next tier
+    const nextTier = achievement.tiers.find(t => t.tier === currentTier + 1);
+    if (nextTier && progress >= nextTier.target) {
+      newlyUnlocked.push({ achievementId: achievement.id, newTier: nextTier.tier });
     }
-    
-    return newlyUnlocked;
+  }
+
+  return newlyUnlocked;
+};
+
+/**
+ * Get all unlocked achievements with full data
+ */
+export const getUnlockedAchievementsWithData = (gameState: GameState) => {
+  return gameState.unlockedAchievements.map(unlocked => {
+    const achievement = ACHIEVEMENTS.find(a => a.id === unlocked.id);
+    if (!achievement) return null;
+
+    const progress = calculateAchievementProgress(achievement.id, gameState);
+    const currentTierData = achievement.tiers.find(t => t.tier === unlocked.highestTier);
+    const nextTier = achievement.tiers.find(t => t.tier === unlocked.highestTier + 1);
+
+    return {
+      ...unlocked,
+      achievement,
+      currentTierData,
+      nextTier,
+      progress,
+      nextTierTarget: nextTier?.target,
+    };
+  }).filter(Boolean);
+};
+
+/**
+ * Get all locked achievements with progress
+ */
+export const getLockedAchievementsWithProgress = (gameState: GameState) => {
+  const unlockedIds = new Set(gameState.unlockedAchievements.map(u => u.id));
+  
+  return ACHIEVEMENTS
+    .filter(achievement => !unlockedIds.has(achievement.id) && !achievement.isSecret)
+    .map(achievement => {
+      const progress = calculateAchievementProgress(achievement.id, gameState);
+      const firstTier = achievement.tiers[0];
+
+      return {
+        achievement,
+        progress,
+        target: firstTier.target,
+        percentage: (progress / firstTier.target) * 100,
+      };
+    });
+};
+
+/**
+ * Get achievements by category
+ */
+export const getAchievementsByCategory = (gameState: GameState) => {
+  const unlocked = getUnlockedAchievementsWithData(gameState);
+  const locked = getLockedAchievementsWithProgress(gameState);
+
+  const categories: Record<string, any[]> = {};
+
+  // Group unlocked by category
+  unlocked.forEach((item: any) => {
+    const category = item.achievement.category;
+    if (!categories[category]) categories[category] = [];
+    categories[category].push({ ...item, isUnlocked: true });
+  });
+
+  // Group locked by category
+  locked.forEach(item => {
+    const category = item.achievement.category;
+    if (!categories[category]) categories[category] = [];
+    categories[category].push({ ...item, isUnlocked: false });
+  });
+
+  return categories;
+};
+
+/**
+ * Get achievement stats
+ */
+export const getAchievementStats = (gameState: GameState) => {
+  const totalAchievements = ACHIEVEMENTS.length;
+  const unlockedCount = gameState.unlockedAchievements.length;
+  const totalTiers = ACHIEVEMENTS.reduce((sum, a) => sum + a.tiers.length, 0);
+  const unlockedTiers = gameState.unlockedAchievements.reduce((sum, u) => sum + u.highestTier, 0);
+
+  const rarities = gameState.unlockedAchievements.map(u => {
+    const achievement = ACHIEVEMENTS.find(a => a.id === u.id);
+    const tier = achievement?.tiers.find(t => t.tier === u.highestTier);
+    return tier?.rarity;
+  }).filter(Boolean);
+
+  const rarityCounts = rarities.reduce((acc: Record<string, number>, r) => {
+    if (r) {
+      acc[r] = (acc[r] || 0) + 1;
+    }
+    return acc;
+  }, {});
+
+  return {
+    totalAchievements,
+    unlockedCount,
+    totalTiers,
+    unlockedTiers,
+    completionPercentage: (unlockedCount / totalAchievements) * 100,
+    rarityCounts,
+  };
+};
+
+/**
+ * Get all unlocked titles
+ */
+export const getUnlockedTitles = (gameState: GameState): string[] => {
+  const titles: string[] = [];
+  
+  gameState.unlockedAchievements.forEach(unlocked => {
+    const achievement = ACHIEVEMENTS.find(a => a.id === unlocked.id);
+    if (!achievement) return;
+
+    const tier = achievement.tiers.find(t => t.tier === unlocked.highestTier);
+    if (tier?.title) {
+      titles.push(tier.title);
+    }
+  });
+
+  return titles;
+};
+
+/**
+ * Get all unlocked badges
+ */
+export const getUnlockedBadges = (gameState: GameState): string[] => {
+  const badges: string[] = [];
+  
+  gameState.unlockedAchievements.forEach(unlocked => {
+    const achievement = ACHIEVEMENTS.find(a => a.id === unlocked.id);
+    if (!achievement) return;
+
+    const tier = achievement.tiers.find(t => t.tier === unlocked.highestTier);
+    if (tier?.badge) {
+      badges.push(tier.badge);
+    }
+  });
+
+  return badges;
 };
 
 export const checkFocusAchievement = (state: GameState) => {
-    return ACHIEVEMENTS_LIST.find(a => a.id === 'common-03') || null;
+  return ACHIEVEMENTS.find(a => a.id === 'protocol_completions') || null;
 };

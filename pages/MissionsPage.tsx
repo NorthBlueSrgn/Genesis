@@ -44,7 +44,7 @@ const MissionItem: React.FC<{ mission: Mission; onComplete: (id: string) => void
                     
                     {/* Benchmark Display */}
                     {mission.benchmarkTarget && !mission.isCompleted && (
-                        <div className="mt-3 bg-black/40 p-2 rounded border border-indigo-500/30 flex items-center gap-4 text-sm">
+                        <div className="mt-3 bg-gray-800 p-2 rounded border border-indigo-500/30 flex items-center gap-4 text-sm">
                             <div>
                                 <span className="text-gray-500 text-xs block">CURRENT</span>
                                 <span className="text-gray-300 font-mono">{mission.benchmarkTarget.currentBaseline}</span>

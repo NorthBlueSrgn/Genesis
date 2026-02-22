@@ -1,4 +1,3 @@
-
 {
   "hosting": {
     "public": "dist",
@@ -37,11 +36,19 @@
       }
     ],
     "rewrites": [
-      {
-        "source": "**",
-        "destination": "/index.html"
-      }
+      { "source": "/api/companionGreeting", "function": "companionGreeting" },
+      { "source": "/api/companionGreetingV2", "function": "companionGreetingV2" },
+      { "source": "/api/orderChatV2", "function": "orderChatV2" },
+      { "source": "/api/generateNewMission", "function": "generateNewMissionV2" },
+      { "source": "/api/generateSideMission", "function": "generateSideMissionV2" },
+      { "source": "/api/evaluateTaskReport", "function": "evaluateTaskReportV2" },
+      { "source": "/api/generateChapter", "function": "generateChapterV2" },
+      { "source": "/api/generateTacticalSuggestions", "function": "generateTacticalSuggestionsV2" },
+      { "source": "**", "destination": "/index.html" }
     ]
+  },
+  "functions": {
+    "source": "functions"
   },
   "firestore": {
     "rules": "firestore.rules"

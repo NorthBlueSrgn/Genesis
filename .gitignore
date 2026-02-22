@@ -12,6 +12,20 @@ dist
 dist-ssr
 *.local
 
+# Environment variables and secrets
+.env
+.env.local
+.env.*.local
+
+# Firebase Admin SDK (contains sensitive credentials)
+*-firebase-adminsdk*.json
+genesis-protocol-firebase-adminsdk.json
+
+# Sensitive config files
+apiKeyConfig.ts
+users.json
+abas-profile-export.json
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

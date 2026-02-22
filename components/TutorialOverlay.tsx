@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { useGameState } from '../contexts/GameStateContext';
 import { useLocation } from 'react-router-dom';
 import { ChevronRight, X } from 'lucide-react';
@@ -7,6 +7,9 @@ const TutorialOverlay: React.FC = () => {
     const { gameState, endTour, nextTourStep } = useGameState();
     const location = useLocation();
     const [hasSeenTutorial, setHasSeenTutorial] = useState(false);
+    
+    // Disable tutorial entirely for now - render nothing
+    return null;
     
     if (!gameState?.isTourActive) return null;
 
@@ -151,17 +154,17 @@ const TutorialOverlay: React.FC = () => {
     const currentStepIndex = Math.min(gameState.tourStep, tutorialSteps.length - 1);
     const step = tutorialSteps[currentStepIndex];
 
-    const handleNext = () => {
+    const handleNext = useCallback(() => {
         if (currentStepIndex >= tutorialSteps.length - 1) {
             endTour();
         } else {
             nextTourStep();
         }
-    };
+    }, [currentStepIndex, tutorialSteps.length, endTour, nextTourStep]);
 
-    const handleSkip = () => {
+    const handleSkip = useCallback(() => {
         endTour();
-    };
+    }, [endTour]);
 
     return (
         <div className="fixed inset-0 z-[200] bg-black/80 flex items-center justify-center p-4 backdrop-blur-sm transition-all duration-300">

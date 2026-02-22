@@ -1,9 +1,8 @@
-
 // components/ClassifiedDossier.tsx
 import React, { useEffect, useState, useMemo, useRef } from 'react';
-import { FullCalibrationReport, TalentDna, TalentClass, ObsessionLevel, AttributeRankName } from '../types';
-import { Fingerprint, ShieldAlert, Zap, TrendingUp, BrainCircuit, Target, AlertTriangle, History, Activity, Database, Cpu, Search, Lock, UserCheck, ShieldCheck, ChevronRight, Binary, Signal, AlertOctagon, Star, Award, Shield, ArrowUpRight, BarChart3 } from 'lucide-react';
-import { ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, Cell } from 'recharts';
+import { FullCalibrationReport, TalentDna, TalentClass, ObsessionLevel, AttributeRankName, ResonanceType } from '../types';
+import { Fingerprint, ShieldAlert, Zap, TrendingUp, BrainCircuit, Target, AlertTriangle, History, Activity, Database, Cpu, Search, Lock, UserCheck, ShieldCheck, ChevronRight, Binary, Signal, AlertOctagon, Star, Award, Shield, ArrowUpRight, BarChart3, Heart, Zap as ZapIcon, Brain, Sparkles, Radio, Eye, Crosshair } from 'lucide-react';
+import { ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, Cell, ScatterChart, Scatter } from 'recharts';
 
 interface ClassifiedDossierProps {
     report: FullCalibrationReport;
@@ -21,6 +20,317 @@ const rankGlowMap: Record<AttributeRankName, string> = {
     'S': 'shadow-amber-900/60',
     'SS': 'shadow-red-900/80',
     'SS+': 'shadow-cyan-900/80',
+};
+
+// Psychometric Profile Card
+const PsychometricProfile: React.FC<{ report: FullCalibrationReport }> = ({ report }) => {
+    const getMbtiDescription = (mbti: string) => {
+        const descriptions: Record<string, string> = {
+            'ISTJ': 'The Logistician',
+            'ISFJ': 'The Defender',
+            'INFJ': 'The Advocate',
+            'INTJ': 'The Architect',
+            'ISTP': 'The Virtuoso',
+            'ISFP': 'The Adventurer',
+            'INFP': 'The Mediator',
+            'INTP': 'The Logician',
+            'ESTP': 'The Entrepreneur',
+            'ESFP': 'The Entertainer',
+            'ENFP': 'The Campaigner',
+            'ENTP': 'The Debater',
+            'ESTJ': 'The Executive',
+            'ESFJ': 'The Consul',
+            'ENFJ': 'The Protagonist',
+            'ENTJ': 'The Commander',
+        };
+        return descriptions[mbti] || 'Unknown Archetype';
+    };
+
+    const mbtiProfile = report.mbtiProfile?.split(':')[0] || 'UNK';
+    const archetypeName = getMbtiDescription(mbtiProfile);
+
+    return (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="bg-black/60 border border-purple-900/60 p-6 relative overflow-hidden group hover:border-purple-500/40 transition-all">
+                <div className="absolute inset-0 bg-film-grain !opacity-[0.03]" />
+                <h3 className="text-purple-400 font-black text-[10px] tracking-[0.3em] uppercase mb-3 flex items-center gap-2">
+                    <Brain size={14} /> MBTI Classification
+                </h3>
+                <p className="text-3xl font-black font-orbitron text-purple-300 mb-1">{mbtiProfile}</p>
+                <p className="text-[11px] text-purple-200 font-mono italic">{archetypeName}</p>
+                <div className="mt-4 pt-4 border-t border-purple-900/30 text-[8px] text-gray-500 space-y-1 font-mono">
+                    <p className="text-purple-400"><span className="font-black">E/I:</span> {mbtiProfile.charAt(0)}</p>
+                    <p className="text-purple-400"><span className="font-black">S/N:</span> {mbtiProfile.charAt(1)}</p>
+                    <p className="text-purple-400"><span className="font-black">T/F:</span> {mbtiProfile.charAt(2)}</p>
+                    <p className="text-purple-400"><span className="font-black">J/P:</span> {mbtiProfile.charAt(3)}</p>
+                </div>
+            </div>
+
+            <div className="bg-black/60 border border-cyan-900/60 p-6 relative overflow-hidden group hover:border-cyan-500/40 transition-all">
+                <div className="absolute inset-0 bg-film-grain !opacity-[0.03]" />
+                <h3 className="text-cyan-400 font-black text-[10px] tracking-[0.3em] uppercase mb-3 flex items-center gap-2">
+                    <Sparkles size={14} /> Symbolic Alias
+                </h3>
+                <p className="text-2xl font-black font-orbitron text-cyan-300 mb-2 uppercase">{report.symbolicProfile || 'CIPHER_UNKNOWN'}</p>
+                <div className="bg-cyan-950/20 p-3 border border-cyan-900/40 rounded-sm">
+                    <p className="text-[9px] text-cyan-300 font-mono italic leading-relaxed">
+                        Archetypal resonance mapping. Symbolic profile encodes behavioral predisposition and psychological sovereignty framework.
+                    </p>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// Anomaly Matrix with scatter plot
+const AnomalyMatrix: React.FC<{ report: FullCalibrationReport }> = ({ report }) => {
+    // Generate scatter data for anomaly distribution (Tk vs Ok)
+    const anomalyData = [
+        { tk: report.traitScores.LE || 50, ok: report.traitScores.IP || 50, label: 'User Position', fill: '#a855f7' },
+        { tk: 65, ok: 60, label: 'Norm Cluster', fill: '#666' },
+        { tk: 45, ok: 70, label: 'Outlier A', fill: '#f97316', opacity: 0.3 },
+        { tk: 75, ok: 45, label: 'Outlier B', fill: '#f97316', opacity: 0.3 },
+        { tk: 80, ok: 80, label: 'Singularity', fill: '#fbbf24', opacity: 0.2 },
+    ];
+
+    return (
+        <div className="bg-black/60 border border-red-900/60 p-6 relative overflow-hidden">
+            <div className="absolute inset-0 bg-film-grain !opacity-[0.03]" />
+            <h3 className="text-red-400 font-black text-[10px] tracking-[0.3em] uppercase mb-4 flex items-center gap-2">
+                <Crosshair size={14} /> Anomaly Matrix (Tk vs Ok)
+            </h3>
+            <div className="h-[280px] bg-black/40 border border-red-900/30 rounded-sm relative overflow-hidden">
+                <ResponsiveContainer width="100%" height="100%">
+                    <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
+                        <CartesianGrid strokeDasharray="3,3" stroke="#333" opacity={0.3} />
+                        <XAxis type="number" dataKey="tk" domain={[0, 100]} stroke="#666" label={{ value: 'Tk (Technical Knowledge)', position: 'bottom', fill: '#999', fontSize: 10 }} />
+                        <YAxis type="number" dataKey="ok" domain={[0, 100]} stroke="#666" label={{ value: 'Ok (Operational Kinetics)', angle: -90, position: 'insideLeft', fill: '#999', fontSize: 10 }} />
+                        <Tooltip 
+                            contentStyle={{ backgroundColor: '#000', border: '1px solid #a855f7', borderRadius: '2px' }}
+                            labelStyle={{ color: '#a855f7' }}
+                            cursor={{ fill: 'rgba(168, 85, 247, 0.1)' }}
+                        />
+                        <Scatter name="Anomalies" data={anomalyData} fill="#a855f7" />
+                    </ScatterChart>
+                </ResponsiveContainer>
+            </div>
+            <div className="mt-4 grid grid-cols-2 gap-3 text-[8px]">
+                <div className="bg-black/40 border border-red-900/30 p-2 rounded-sm"><span className="text-red-400 font-black">Tk:</span> <span className="text-gray-400">Technical Knowledge intensity</span></div>
+                <div className="bg-black/40 border border-red-900/30 p-2 rounded-sm"><span className="text-red-400 font-black">Ok:</span> <span className="text-gray-400">Operational Kinetics manifestation</span></div>
+                <div className="bg-black/40 border border-red-900/30 p-2 rounded-sm"><span className="text-red-400 font-black">Quadrant:</span> <span className="text-gray-400">Position indicates anomaly type</span></div>
+                <div className="bg-black/40 border border-red-900/30 p-2 rounded-sm"><span className="text-red-400 font-black">Ghost Nodes:</span> <span className="text-gray-400">Historical outlier echoes (dim)</span></div>
+            </div>
+        </div>
+    );
+};
+
+// Biometric Vectors
+const BiometricVectors: React.FC<{ report: FullCalibrationReport }> = ({ report }) => {
+    // Use hati field if available, otherwise fallback to percentile calculation
+    const hatiValue = report.hati !== undefined ? report.hati : (report.percentile || 0) * 0.95;
+    const hatiIndex = Number(hatiValue.toFixed(1)); // Show one decimal place
+    const ceilingRank = report.estimatedCeilingRank || 'A';
+    const talentDnaScore = Math.round((report.talentDna?.BP || 0.5) * 100);
+    const baselineAdjusted = report.baselineAdjusted || false;
+
+    // Determine HATI rank
+    const getHATIRank = (hati: number): string => {
+        if (hati >= 99.9) return 'SS+';
+        if (hati >= 97) return 'SS';
+        if (hati >= 90) return 'S';
+        if (hati >= 75) return 'A';
+        if (hati >= 60) return 'B';
+        if (hati >= 40) return 'C';
+        if (hati >= 20) return 'D';
+        return 'E';
+    };
+
+    const hatiRank = getHATIRank(hatiIndex);
+    const rankColor = hatiRank === 'SS+' || hatiRank === 'SS' ? 'text-cyan-300' :
+                      hatiRank === 'S' ? 'text-amber-300' :
+                      hatiRank === 'A' ? 'text-indigo-300' :
+                      hatiRank === 'B' ? 'text-purple-300' :
+                      hatiRank === 'C' ? 'text-blue-300' :
+                      'text-green-300';
+
+    // Calculate next rank thresholds and progress
+    const rankThresholds = { E: 0, D: 20, C: 40, B: 60, A: 75, S: 90, SS: 97, 'SS+': 99.9 };
+    const currentThreshold = rankThresholds[hatiRank as keyof typeof rankThresholds];
+    const nextRankName = hatiRank === 'SS+' ? null :
+                        hatiRank === 'SS' ? 'SS+' :
+                        hatiRank === 'S' ? 'SS' :
+                        hatiRank === 'A' ? 'S' :
+                        hatiRank === 'B' ? 'A' :
+                        hatiRank === 'C' ? 'B' :
+                        hatiRank === 'D' ? 'C' : 'D';
+    const nextThreshold = nextRankName ? rankThresholds[nextRankName as keyof typeof rankThresholds] : 100;
+    const progressPercent = nextRankName 
+        ? ((hatiIndex - currentThreshold) / (nextThreshold - currentThreshold)) * 100 
+        : 100;
+
+    return (
+        <div className="bg-black/60 border border-green-900/60 p-6 relative overflow-hidden">
+            <div className="absolute inset-0 bg-film-grain !opacity-[0.03]" />
+            <h3 className="text-green-400 font-black text-[10px] tracking-[0.3em] uppercase mb-4 flex items-center gap-2">
+                <Activity size={14} /> Biometric Vectors
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="bg-black/50 border border-green-900/40 p-4 rounded-sm">
+                    <div className="text-[9px] text-gray-500 font-mono mb-2 uppercase tracking-tighter">HATI Index</div>
+                    <div className={`text-3xl font-black font-orbitron ${rankColor} mb-2 flex items-center gap-2`}>
+                        {hatiIndex}%
+                        <span className="text-sm font-normal">{hatiRank}</span>
+                    </div>
+                    <div className="text-[8px] text-gray-600 font-mono mb-2">Human Apex Threat Index</div>
+                    
+                    {/* HATI Progress Bar to Next Rank */}
+                    {nextRankName && (
+                        <div className="mt-3 pt-3 border-t border-green-900/30">
+                            <div className="flex justify-between items-center mb-1.5">
+                                <span className="text-[8px] text-gray-500 font-mono uppercase">Progress to {nextRankName}</span>
+                                <span className="text-[8px] text-green-400 font-black font-mono">{progressPercent.toFixed(1)}%</span>
+                            </div>
+                            <div className="w-full h-2 bg-gray-900 rounded-full overflow-hidden border border-gray-800">
+                                <div 
+                                    className={`h-full transition-all duration-1000 ${
+                                        nextRankName === 'SS+' ? 'bg-gradient-to-r from-cyan-500 to-purple-500' :
+                                        nextRankName === 'SS' ? 'bg-cyan-500' :
+                                        nextRankName === 'S' ? 'bg-amber-500' :
+                                        nextRankName === 'A' ? 'bg-indigo-500' :
+                                        nextRankName === 'B' ? 'bg-purple-500' :
+                                        nextRankName === 'C' ? 'bg-blue-500' :
+                                        'bg-green-500'
+                                    } shadow-[0_0_10px_currentColor]`}
+                                    style={{ width: `${Math.min(progressPercent, 100)}%` }}
+                                />
+                            </div>
+                            <div className="flex justify-between text-[7px] text-gray-600 font-mono mt-1">
+                                <span>{hatiRank} ({currentThreshold}%)</span>
+                                <span>{nextRankName} ({nextThreshold}%)</span>
+                            </div>
+                        </div>
+                    )}
+                    
+                    {baselineAdjusted && (
+                        <div className="mt-2 pt-2 border-t border-green-900/30">
+                            <div className="text-[8px] text-green-400 font-mono italic">
+                                ⚡ B-Rank Baseline Active
+                            </div>
+                            <div className="text-[7px] text-gray-500 font-mono">
+                                Starting as Elite Hunter
+                            </div>
+                        </div>
+                    )}
+                </div>
+                <div className="bg-black/50 border border-green-900/40 p-4 rounded-sm">
+                    <div className="text-[9px] text-gray-500 font-mono mb-2 uppercase tracking-tighter">Ceiling Rank</div>
+                    <div className="text-3xl font-black font-orbitron text-green-300 mb-2">{ceilingRank}</div>
+                    <div className="text-[8px] text-gray-600 font-mono">Estimated maximum achievable rank</div>
+                </div>
+                <div className="bg-black/50 border border-green-900/40 p-4 rounded-sm">
+                    <div className="text-[9px] text-gray-500 font-mono mb-2 uppercase tracking-tighter">Talent DNA Score</div>
+                    <div className="text-3xl font-black font-orbitron text-green-300 mb-2">{talentDnaScore}%</div>
+                    <div className="text-[8px] text-gray-600 font-mono">Base potential coefficient</div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// Risk Assessment Panel
+const RiskAssessment: React.FC<{ report: FullCalibrationReport }> = ({ report }) => {
+    const failureNodeRisk = String((report as any)?.failureNodeRisk || '');
+    const failureRiskLevel = failureNodeRisk.includes('Critical') ? 'CRITICAL' : 
+                             failureNodeRisk.includes('High') ? 'HIGH' : 'MODERATE';
+    const failureColor = failureRiskLevel === 'CRITICAL' ? 'text-red-500' : failureRiskLevel === 'HIGH' ? 'text-orange-500' : 'text-yellow-500';
+    const failureBg = failureRiskLevel === 'CRITICAL' ? 'bg-red-950/20 border-red-900/40' : 
+                      failureRiskLevel === 'HIGH' ? 'bg-orange-950/20 border-orange-900/40' : 'bg-yellow-950/20 border-yellow-900/40';
+
+    return (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className={`${failureBg} border p-6 relative overflow-hidden rounded-sm`}>
+                <div className="absolute inset-0 bg-film-grain !opacity-[0.03]" />
+                <h3 className={`${failureColor} font-black text-[10px] tracking-[0.3em] uppercase mb-3 flex items-center gap-2`}>
+                    <AlertTriangle size={14} /> Failure Node
+                </h3>
+                <p className={`${failureColor} font-black text-lg font-orbitron mb-3 uppercase`}>{report.primaryFailureNode}</p>
+                <div className="bg-black/60 p-3 border border-gray-800 rounded-sm">
+                    <p className={`${failureColor} text-[9px] font-mono italic`}>Trigger: {failureNodeRisk || 'N/A'}</p>
+                </div>
+                <div className="mt-4 flex items-center gap-2 text-[9px]">
+                    <div className={`w-3 h-3 rounded-full ${failureRiskLevel === 'CRITICAL' ? 'bg-red-500 animate-pulse' : 'bg-yellow-500'}`} />
+                    <span className="text-gray-400">Risk Level: <span className={`${failureColor} font-black`}>{failureRiskLevel}</span></span>
+                </div>
+            </div>
+
+            <div className="bg-blue-950/20 border border-blue-900/40 p-6 relative overflow-hidden rounded-sm">
+                <div className="absolute inset-0 bg-film-grain !opacity-[0.03]" />
+                <h3 className="text-blue-400 font-black text-[10px] tracking-[0.3em] uppercase mb-3 flex items-center gap-2">
+                    <Eye size={14} /> Success Probability
+                </h3>
+                <div className="text-4xl font-black font-orbitron text-blue-300 mb-4">{report.successProbability}%</div>
+                <div className="h-2 bg-black/60 border border-blue-900/30 rounded-full overflow-hidden">
+                    <div className="h-full bg-gradient-to-r from-blue-500 to-cyan-500" style={{width: `${report.successProbability}%`}} />
+                </div>
+                <div className="mt-4 grid grid-cols-2 gap-2 text-[8px]">
+                    <div className="text-gray-400">Success: <span className="text-blue-400 font-black">{report.successProbability}%</span></div>
+                    <div className="text-gray-400">Dropout: <span className="text-red-400 font-black">{report.dropoutProbability}%</span></div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// Resonance Signature
+const ResonanceSignature: React.FC<{ report: FullCalibrationReport }> = ({ report }) => {
+    const getResonanceProfile = () => {
+        // Map rarity band to resonance type
+        const rarityToResonance: Record<string, ResonanceType> = {
+            'Singularity': ResonanceType.Juggernaut,
+            'Outlier': ResonanceType.Catalyst,
+            'Abnormality': ResonanceType.Virtuoso,
+            'Exceptional': ResonanceType.Chameleon,
+            'Optimized': ResonanceType.Cipher,
+        };
+        return rarityToResonance[report.rarityBand] || ResonanceType.Unawakened;
+    };
+
+    const resonanceType = getResonanceProfile();
+    const resonanceDescriptions: Record<ResonanceType, { ability: string; aura: string }> = {
+        [ResonanceType.Juggernaut]: { ability: 'Unstoppable Momentum', aura: 'Crushing pressure—relentless forward motion' },
+        [ResonanceType.Catalyst]: { ability: 'Activation Protocol', aura: 'Spark that ignites change in systems' },
+        [ResonanceType.Virtuoso]: { ability: 'Precision Mastery', aura: 'Effortless control and technical transcendence' },
+        [ResonanceType.Chameleon]: { ability: 'Adaptive Evolution', aura: 'Seamless metamorphosis across domains' },
+        [ResonanceType.Cipher]: { ability: 'Invisible Architect', aura: 'Hidden shaper of outcomes' },
+        [ResonanceType.Joker]: { ability: 'Chaos Weaver', aura: 'Unpredictable breakthrough potential' },
+        [ResonanceType.Unawakened]: { ability: 'Dormant Potential', aura: 'Calibrating...' },
+    };
+
+    const profile = resonanceDescriptions[resonanceType];
+
+    return (
+        <div className="bg-gradient-to-r from-purple-950/40 to-pink-950/40 border border-purple-900/60 p-6 relative overflow-hidden rounded-sm">
+            <div className="absolute inset-0 bg-film-grain !opacity-[0.03]" />
+            <div className="absolute top-2 right-2 opacity-10"><Radio size={40} className="text-purple-500" /></div>
+            <h3 className="text-purple-400 font-black text-[10px] tracking-[0.3em] uppercase mb-4 flex items-center gap-2">
+                <Radio size={14} /> Resonance Signature
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <div className="text-[9px] text-gray-500 font-mono mb-1 uppercase tracking-tighter">Type</div>
+                    <div className="text-2xl font-black font-orbitron text-purple-300 uppercase mb-4">{resonanceType}</div>
+                    <div className="text-[9px] text-gray-500 font-mono mb-1 uppercase tracking-tighter">Tier</div>
+                    <div className="text-lg font-black font-orbitron text-purple-400">{report.rarityBand}</div>
+                </div>
+                <div className="bg-black/50 border border-purple-900/40 p-4 rounded-sm">
+                    <div className="text-[9px] text-purple-400 font-black mb-2 uppercase tracking-tighter">Ability</div>
+                    <p className="text-[11px] font-black font-orbitron text-purple-200 mb-3">{profile.ability}</p>
+                    <div className="text-[9px] text-purple-400 font-black mb-1 uppercase tracking-tighter">Aura</div>
+                    <p className="text-[10px] text-purple-300 font-mono italic">{profile.aura}</p>
+                </div>
+            </div>
+        </div>
+    );
 };
 
 // Singularity Plot: Clean grid showing Talent (Y) vs Obsession (X)
@@ -287,10 +597,55 @@ export const ClassifiedDossier: React.FC<ClassifiedDossierProps> = ({ report, on
                     )}
                 </section>
 
+                {/* SECTION 2: PSYCHOMETRIC PROFILE */}
+                <section className="space-y-6 animate-in slide-in-from-bottom-8 duration-700 delay-100">
+                    <div className="flex items-center gap-4 border-l-4 border-purple-600 pl-4">
+                        <span className="bg-purple-600 text-black px-2 py-0.5 text-[10px] font-black font-orbitron">TIER_02A</span>
+                        <h2 className="text-xl font-black font-orbitron text-white tracking-widest uppercase">Psychometric Profile</h2>
+                    </div>
+                    <PsychometricProfile report={report} />
+                </section>
+
+                {/* SECTION 3: ANOMALY MATRIX */}
+                <section className="space-y-6 animate-in slide-in-from-bottom-8 duration-700 delay-100">
+                    <div className="flex items-center gap-4 border-l-4 border-red-600 pl-4">
+                        <span className="bg-red-600 text-white px-2 py-0.5 text-[10px] font-black font-orbitron">TIER_02B</span>
+                        <h2 className="text-xl font-black font-orbitron text-white tracking-widest uppercase">Anomaly Matrix & Quadrant Mapping</h2>
+                    </div>
+                    <AnomalyMatrix report={report} />
+                </section>
+
+                {/* SECTION 4: BIOMETRIC VECTORS */}
+                <section className="space-y-6 animate-in slide-in-from-bottom-8 duration-700 delay-100">
+                    <div className="flex items-center gap-4 border-l-4 border-green-600 pl-4">
+                        <span className="bg-green-600 text-black px-2 py-0.5 text-[10px] font-black font-orbitron">TIER_02C</span>
+                        <h2 className="text-xl font-black font-orbitron text-white tracking-widest uppercase">Biometric Vectors</h2>
+                    </div>
+                    <BiometricVectors report={report} />
+                </section>
+
+                {/* SECTION 5: RISK ASSESSMENT */}
+                <section className="space-y-6 animate-in slide-in-from-bottom-8 duration-700 delay-100">
+                    <div className="flex items-center gap-4 border-l-4 border-orange-600 pl-4">
+                        <span className="bg-orange-600 text-black px-2 py-0.5 text-[10px] font-black font-orbitron">TIER_02D</span>
+                        <h2 className="text-xl font-black font-orbitron text-white tracking-widest uppercase">Risk Assessment</h2>
+                    </div>
+                    <RiskAssessment report={report} />
+                </section>
+
+                {/* SECTION 6: RESONANCE SIGNATURE */}
+                <section className="space-y-6 animate-in slide-in-from-bottom-8 duration-700 delay-100">
+                    <div className="flex items-center gap-4 border-l-4 border-pink-600 pl-4">
+                        <span className="bg-pink-600 text-black px-2 py-0.5 text-[10px] font-black font-orbitron">TIER_02E</span>
+                        <h2 className="text-xl font-black font-orbitron text-white tracking-widest uppercase">Resonance Signature</h2>
+                    </div>
+                    <ResonanceSignature report={report} />
+                </section>
+
                 {/* SECTION 2: NEURAL ARCHITECTURE & COMPARATIVE MAPPING */}
                 <section className="space-y-6 animate-in slide-in-from-bottom-8 duration-700 delay-200">
                     <div className="flex items-center gap-4 border-l-4 border-cyan-600 pl-4">
-                        <span className="bg-cyan-600 text-black px-2 py-0.5 text-[10px] font-black font-orbitron">TIER_02</span>
+                        <span className="bg-cyan-600 text-black px-2 py-0.5 text-[10px] font-black font-orbitron">TIER_03</span>
                         <h2 className="text-xl font-black font-orbitron text-white tracking-widest uppercase">Neural architecture mapping</h2>
                     </div>
 
@@ -342,7 +697,7 @@ export const ClassifiedDossier: React.FC<ClassifiedDossierProps> = ({ report, on
                 {/* SECTION 3: SYSTEM WARNINGS & STRATEGIC INSIGHT */}
                 <section className="space-y-8 animate-in slide-in-from-bottom-8 duration-700 delay-300">
                     <div className="flex items-center gap-4 border-l-4 border-red-600 pl-4">
-                        <span className="bg-red-600 text-white px-2 py-0.5 text-[10px] font-black font-orbitron">TIER_03</span>
+                        <span className="bg-red-600 text-white px-2 py-0.5 text-[10px] font-black font-orbitron">TIER_04</span>
                         <h2 className="text-xl font-black font-orbitron text-white tracking-widest uppercase">Neural Friction & Critical Failures</h2>
                     </div>
 
@@ -404,7 +759,7 @@ export const ClassifiedDossier: React.FC<ClassifiedDossierProps> = ({ report, on
                 {/* SECTION 4: GROWTH VECTORS & POTENTIAL */}
                 <section className="space-y-6 animate-in slide-in-from-bottom-8 duration-700 delay-400">
                     <div className="flex items-center gap-4 border-l-4 border-indigo-600 pl-4">
-                        <span className="bg-indigo-600 text-black px-2 py-0.5 text-[10px] font-black font-orbitron">TIER_04</span>
+                        <span className="bg-indigo-600 text-black px-2 py-0.5 text-[10px] font-black font-orbitron">TIER_05</span>
                         <h2 className="text-xl font-black font-orbitron text-white tracking-widest uppercase">Growth Vectors & Potential Ceiling</h2>
                     </div>
 
@@ -468,7 +823,7 @@ export const ClassifiedDossier: React.FC<ClassifiedDossierProps> = ({ report, on
                 {/* SECTION 5: SIGNATURE ACHIEVEMENTS & RARE FEATS */}
                 <section className="space-y-6 animate-in slide-in-from-bottom-8 duration-700 delay-500">
                     <div className="flex items-center gap-4 border-l-4 border-yellow-600 pl-4">
-                        <span className="bg-yellow-600 text-black px-2 py-0.5 text-[10px] font-black font-orbitron">TIER_05</span>
+                        <span className="bg-yellow-600 text-black px-2 py-0.5 text-[10px] font-black font-orbitron">TIER_06</span>
                         <h2 className="text-xl font-black font-orbitron text-white tracking-widest uppercase">Signature Achievements & Rare Markers</h2>
                     </div>
 
@@ -506,7 +861,7 @@ export const ClassifiedDossier: React.FC<ClassifiedDossierProps> = ({ report, on
                 {/* SECTION 6: FINAL CLASSIFICATION & OPERATIONAL DIRECTIVE */}
                 <section className="space-y-6 animate-in slide-in-from-bottom-8 duration-700 delay-600">
                     <div className="flex items-center gap-4 border-l-4 border-white pl-4">
-                        <span className="bg-white text-black px-2 py-0.5 text-[10px] font-black font-orbitron">TIER_06</span>
+                        <span className="bg-white text-black px-2 py-0.5 text-[10px] font-black font-orbitron">TIER_07</span>
                         <h2 className="text-xl font-black font-orbitron text-white tracking-widest uppercase">Operational Classification & Final Directive</h2>
                     </div>
 

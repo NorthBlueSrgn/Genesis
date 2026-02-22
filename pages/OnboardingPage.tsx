@@ -10,6 +10,7 @@ import { CALIBRATION_BENCHMARKS, HOBBY_LIST } from '../data/calibrationData';
 import { MBTI_QUESTIONS, calculateMBTI } from '../data/mbtiData';
 import { KNOWLEDGE_QUESTIONS_V2, getAdaptiveQuestionV2, checkAnswer, KnowledgeQuestionV2 } from '../data/knowledgeQuestionBankV2';
 import { CREATIVITY_ASSESSMENT_PROMPTS } from '../data/creativityAssessmentFinal';
+import { PREDETERMINED_STATS, DEFAULT_CALIBRATION_REPORT, DEFAULT_TALENT_DNA, DEFAULT_TALENT_PROFILE } from '../data/predeterminedStats';
 import { ArrowRight, Check, X, Timer, Terminal, BrainCircuit, Activity, SkipForward, Swords, Shield, Zap, Grid, Eye, Send, Lock, Scale, MousePointer2, AlertTriangle, Fingerprint, Shuffle, Circle, Square, Wind, Lightbulb, Target, Book, PenTool, Scale as Scales, StopCircle, Triangle, Hexagon, Star, HelpCircle, Diamond, Database, MousePointer, ShieldAlert, FileWarning, Cpu, Scan, RefreshCw, RotateCcw, Clock, MoveHorizontal, Info, ChevronRight, Signal, AlertOctagon, TrendingUp, SwordsIcon, Map as MapIcon, Flag, Globe, Landmark, UserCheck, Sparkles, Wand2, Activity as Pulse, Palette } from 'lucide-react';
 import { performTraitAnalysis, calculateCeilingRank, mapScoreToRank, calculateTalentDistribution, getPercentileForSubstat, calculateInitialResonanceVector, convertPercentileToSubstatValue, calculateScores, generateCodename, getPercentileForMetric, calculateSubstatsFromAllTests, interpolate } from '../services/scoringService';
 import { ClassifiedDossier } from '../components/ClassifiedDossier';
@@ -53,7 +54,7 @@ export const TerminalShell: React.FC<{ children: React.ReactNode; title: string;
         <div className="absolute inset-0 pointer-events-none z-0 opacity-[0.07] bg-film-grain mix-blend-overlay" />
         <div className="absolute inset-0 pointer-events-none z-0 opacity-[0.1] scanline-overlay" />
         
-        <div className={`bg-black/40 border-b ${accentClass} p-2 sm:p-3 flex justify-between items-center relative overflow-hidden flex-shrink-0 z-10`}>
+        <div className={`bg-gray-900 border-b ${accentClass} p-2 sm:p-3 flex justify-between items-center relative overflow-hidden flex-shrink-0 z-10`}>
             <div className="flex items-center gap-1 sm:gap-2 flex-shrink">
                 <Terminal size={12} className="text-current opacity-70 flex-shrink-0" />
                 <span className="font-orbitron font-bold text-[8px] sm:text-[10px] tracking-[0.1em] sm:tracking-[0.2em] text-current uppercase truncate">{title}</span>
@@ -157,7 +158,7 @@ const MBTITest: React.FC<{ onComplete: (data: any) => void }> = ({ onComplete })
     const progress = ((qIndex + 1) / MBTI_QUESTIONS.length) * 100;
     return (
         <TerminalShell title="Psychometric Profiling // MBTI-24">
-            <div className="w-full bg-gray-900 h-1 rounded-full mb-8 relative">
+            <div className="w-full bg-gray-800 h-1 rounded-full mb-8 relative">
                 <div className="bg-cyan-500 h-full rounded-full transition-all duration-300 shadow-[0_0_10px_#06b6d4]" style={{ width: `${progress}%` }} />
                 <div className="absolute -top-4 right-0 text-[8px] text-cyan-600 font-mono uppercase tracking-widest">Calibration: {Math.round(progress)}%</div>
             </div>
@@ -418,271 +419,6 @@ const ResilienceStroop: React.FC<{ onComplete: (data: any) => void }> = ({ onCom
     );
 };
 
-const DilemmaScreening: React.FC<{ onComplete: (data: any) => void }> = ({ onComplete }) => {
-    // Dilemma substat mapping: each answer code maps to substats it tests
-    const answerSubstatMap: Record<string, Record<string, number>> = {
-        // Dilemma 1: Process vs Impact
-        'PROCESS_FIRST': { Conviction: 80, Willpower: 70, Composure: 60 },
-        'IMPACT_OVER_RULES': { Empathy: 75, Purpose: 80, Conviction: 30 },
-        'DIALOGUE_FIRST': { Charisma: 75, Empathy: 80, Reason: 60 },
-        'SELF_INTEREST': { Resilience: 40, Conviction: 20, Charisma: 50 },
-        'NUANCE_SEEKING': { Reason: 80, Conviction: 75, Empathy: 70 },
-        // Dilemma 2: Opportunity vs Presence
-        'OPPORTUNITY_FIRST': { Resilience: 70, Conviction: 40 },
-        'PRESENCE_MATTERS': { Empathy: 85, Purpose: 85, Faith: 75 },
-        'CREATIVE_SOLUTION': { Reason: 80, Innovation: 75, Purpose: 70 },
-        'CONVINCE_THEM': { Charisma: 70, Conviction: 40 },
-        'ACCEPT_PAIN': { Composure: 80, Empathy: 75, Conviction: 85 },
-        // Dilemma 3: Friendship Dynamics
-        'PURITY_TEST': { Conviction: 85, Willpower: 80 },
-        'STRATEGIC_DISTANCE': { Reason: 75, Resilience: 70 },
-        'HONEST_CONFRONTATION': { Charisma: 70, Conviction: 75 },
-        'TIT_FOR_TAT': { Conviction: 30, Composure: 40 },
-        'MATURE_ACCEPTANCE': { Empathy: 80, Reason: 75, Conviction: 70 },
-        // Dilemma 4: Medical Autonomy
-        'AUTONOMY_ABSOLUTE': { Reason: 80, Conviction: 75 },
-        'WEIGH_STAKES': { Reason: 75, Empathy: 75 },
-        'PROTECT_CHILD': { Purpose: 85, Conviction: 70, Willpower: 75 },
-        'BRIDGE_BUILDING': { Charisma: 75, Reason: 70, Empathy: 70 },
-        'EMBRACE_CONFLICT': { Composure: 80, Conviction: 75, Empathy: 70 },
-        // Dilemma 5: Charity Dilemma
-        'COMPASSION_FIRST': { Empathy: 85, Purpose: 80, Faith: 75 },
-        'SELF_PRESERVATION': { Resilience: 70, Conviction: 40 },
-        'ENABLE_AGENCY': { Empathy: 70, Reason: 75, Purpose: 75 },
-        'PRACTICAL_GENEROSITY': { Empathy: 80, Reason: 75 },
-        'BOUNDED_HELP': { Reason: 80, Composure: 75, Empathy: 70 },
-        // Dilemma 6: Environmental Ethics
-        'TRANSPARENCY_OUTSOURCE': { Conviction: 70, Reason: 80 },
-        'INTERNAL_VOICE': { Purpose: 75, Charisma: 70, Conviction: 70 },
-        'ROLE_ACCEPTANCE': { Conviction: 30, Resilience: 60 },
-        'VOTE_WITH_FEET': { Purpose: 85, Conviction: 80, Willpower: 75 },
-        'STRATEGIC_INSIDER': { Reason: 80, Strategy: 75, Purpose: 75 },
-        // Dilemma 7: Parental Judgment
-        'TRUST_TIMELINE': { Empathy: 85, Purpose: 80, Faith: 75 },
-        'INFORMED_HELP': { Reason: 75, Empathy: 75, Purpose: 75 },
-        'SHARED_BURDEN': { Resilience: 70, Composure: 70 },
-        'PARENTAL_OVERRIDE': { Conviction: 75, Willpower: 80, Purpose: 70 },
-        'MEET_THEM_THERE': { Empathy: 85, Charisma: 70, Purpose: 75 },
-        // Dilemma 8: Speaking Up Under Risk
-        'INTEGRITY_OVER_SAFETY': { Conviction: 90, Purpose: 85, Willpower: 85 },
-        'PROTECT_SELF': { Resilience: 60, Conviction: 30 },
-        'STRATEGIC_SUPPORT': { Reason: 75, Charisma: 70, Purpose: 70 },
-        'INDIRECT_ACTION': { Strategy: 80, Reason: 75, Purpose: 75 },
-        'LONG_GAME': { Reason: 80, Strategy: 80, Purpose: 75 },
-        // Dilemma 9: Hiring Decision
-        'NETWORKS_PRACTICAL': { Conviction: 40, Reason: 50 },
-        'CORRECT_IMBALANCES': { Purpose: 85, Empathy: 80, Conviction: 75 },
-        'MERIT_NEUTRAL': { Reason: 75, Conviction: 60 },
-        'SOLVE_CREATIVELY': { Reason: 80, Innovation: 80, Purpose: 75 },
-        'ACKNOWLEDGE_HARM': { Empathy: 85, Conviction: 75, Composure: 75 },
-        // Dilemma 10: Unethical Data
-        'UTILITARIAN_USE': { Reason: 70, Purpose: 60, Conviction: 40 },
-        'PRINCIPLE_OVER_BENEFIT': { Conviction: 85, Purpose: 80, Willpower: 75 },
-        'REDEMPTIVE_USE': { Reason: 80, Purpose: 80, Conviction: 75 },
-        'CONSENT_SEEKING': { Empathy: 85, Purpose: 85, Reason: 75 },
-        'INTEGRITY_SLOWER': { Conviction: 85, Willpower: 80, Purpose: 80 },
-        // Dilemma 11: Historical Crime
-        'TRUTH_ABSOLUTE': { Conviction: 85, Purpose: 75, Willpower: 80 },
-        'REDEMPTION_PATH': { Empathy: 80, Purpose: 80, Reason: 75 },
-        'LET_PAST_REST': { Composure: 75, Conviction: 45, Resilience: 70 },
-        'GUIDED_HONESTY': { Empathy: 80, Charisma: 75, Purpose: 80 },
-        'NO_CLEAN_ANSWER': { Composure: 80, Conviction: 75, Empathy: 75 },
-        // Dilemma 12: Group Dissent
-        'VOICE_ALWAYS': { Conviction: 75, Charisma: 70, Purpose: 70 },
-        'DEFER_TO_GROUP': { Composure: 70, Conviction: 40, Resilience: 60 },
-        'PRIVATE_DISSENT': { Reason: 70, Strategy: 75 },
-        'GENTLE_CHALLENGE': { Charisma: 75, Reason: 70, Empathy: 70 },
-        'STRATEGIC_ALLIES': { Strategy: 80, Charisma: 75, Reason: 70 },
-        // Dilemma 13: Helping Against Wishes
-        'BREAK_BOUNDARY': { Purpose: 75, Willpower: 75, Conviction: 60 },
-        'HANDS_OFF': { Reason: 75, Conviction: 70, Empathy: 60 },
-        'SEEK_PERMISSION': { Charisma: 75, Empathy: 80, Reason: 70 },
-        'GENTLE_NUDGE': { Charisma: 80, Empathy: 75, Strategy: 70 },
-        'SUPPORT_ONLY': { Empathy: 85, Resilience: 75, Purpose: 75 },
-        // Dilemma 14: Personal Error
-        'INTEGRITY_AUTOMATIC': { Conviction: 90, Willpower: 85, Composure: 75 },
-        'EXPLOIT_ADVANTAGE': { Conviction: 20, Resilience: 50 },
-        'DELAYED_HONESTY': { Conviction: 50, Composure: 60 },
-        'DEEPEN_DECEPTION': { Conviction: 10, Willpower: 30 },
-        'RESENTFUL_HONESTY': { Conviction: 70, Willpower: 75, Composure: 65 },
-        // Dilemma 15: Allocation Under Scarcity
-        'UTILITARIAN_MATH': { Reason: 80, Purpose: 60 },
-        'EQUITY_FOCUS': { Purpose: 85, Empathy: 80, Conviction: 80 },
-        'EQUAL_SHARE': { Fairness: 75, Conviction: 70 },
-        'RELATIONAL_CHOICE': { Resilience: 60, Conviction: 40 },
-        'REJECT_FALSE_DILEMMA': { Reason: 85, Innovation: 75, Purpose: 75 },
-    };
-
-    const baseDilemmas = [
-        { q: "Your team discovers that a colleague has been quietly funneling company resources to help underprivileged communities they grew up in. It's technically illegal, but the work is genuinely helping people. Do you:", options: [ { text: "Report it immediately—rules exist for reasons.", code: "PROCESS_FIRST" }, { text: "Turn a blind eye; they're doing real good and no one's harmed.", code: "IMPACT_OVER_RULES" }, { text: "Talk to them privately first and help them find legal ways to continue.", code: "DIALOGUE_FIRST" }, { text: "Use this knowledge as leverage for personal gain later.", code: "SELF_INTEREST" }, { text: "Report it but recommend they get commended for their intent.", code: "NUANCE_SEEKING" } ] },
-        { q: "You're offered a promotion that would triple your salary, but it requires moving to a city where your aging parent lives alone without family nearby. They'll need to go to a facility.", options: [ { text: "Take the promotion; they'll be better cared for in a professional setting anyway.", code: "OPPORTUNITY_FIRST" }, { text: "Refuse the promotion; your presence matters more than money.", code: "PRESENCE_MATTERS" }, { text: "Negotiate with your employer for remote work or try to delay the move.", code: "CREATIVE_SOLUTION" }, { text: "Encourage your parent to move with you; they'd adapt.", code: "CONVINCE_THEM" }, { text: "Accept but feel guilty regardless—there's no perfect answer here.", code: "ACCEPT_PAIN" } ] },
-        { q: "You realize your best friend has been subtly undermining your career for years—nothing malicious, just small acts that make sense for their own advancement. They have no idea you've figured it out.", options: [ { text: "End the friendship immediately; trust is non-negotiable.", code: "PURITY_TEST" }, { text: "Keep the friendship but be more cautious with sensitive information.", code: "STRATEGIC_DISTANCE" }, { text: "Confront them directly about what you've observed.", code: "HONEST_CONFRONTATION" }, { text: "Start subtly undermining them in return to level the playing field.", code: "TIT_FOR_TAT" }, { text: "Accept they're human and flawed, like everyone; stay friends but realistic.", code: "MATURE_ACCEPTANCE" } ] },
-        { q: "You're a doctor and a patient refuses a life-saving treatment due to their religious beliefs. They have a dependent child. Do you:", options: [ { text: "Respect their autonomy completely; it's their body and choice.", code: "AUTONOMY_ABSOLUTE" }, { text: "Try to convince them; the child's wellbeing is also at stake.", code: "WEIGH_STAKES" }, { text: "Go through legal channels to override their decision for the child's sake.", code: "PROTECT_CHILD" }, { text: "Suggest alternative treatments that align with their beliefs.", code: "BRIDGE_BUILDING" }, { text: "Feel genuinely conflicted and acknowledge you can't choose perfectly.", code: "EMBRACE_CONFLICT" } ] },
-        { q: "An old friend asks for a substantial loan they clearly won't be able to repay. They need it for medical treatment. You can afford to lose the money, but you need it for your own goals.", options: [ { text: "Lend it immediately; their health is more important.", code: "COMPASSION_FIRST" }, { text: "Decline; you can't set yourself on fire to keep others warm.", code: "SELF_PRESERVATION" }, { text: "Help them find other resources (grants, payment plans, go-fundme).", code: "ENABLE_AGENCY" }, { text: "Offer to pay for the treatment directly instead of lending money.", code: "PRACTICAL_GENEROSITY" }, { text: "Lend some but set clear expectations about repayment.", code: "BOUNDED_HELP" } ] },
-        { q: "You discover your company is doing something legally permissible but environmentally harmful. The decision-makers genuinely believe the benefit outweighs the cost. Do you:", options: [ { text: "Blow the whistle publicly; let others decide based on facts.", code: "TRANSPARENCY_OUTSOURCE" }, { text: "Go to internal leadership and advocate for change from within.", code: "INTERNAL_VOICE" }, { text: "Stay quiet; it's not your decision to make.", code: "ROLE_ACCEPTANCE" }, { text: "Leave the company; you can't work for something you disagree with.", code: "VOTE_WITH_FEET" }, { text: "Try to work within the system while documenting everything.", code: "STRATEGIC_INSIDER" } ] },
-        { q: "Your teenage child is struggling with their identity and asks you not to tell anyone yet, but you're worried they need professional support. Do you:", options: [ { text: "Honor their request completely; they'll come to you when ready.", code: "TRUST_TIMELINE" }, { text: "Seek professional guidance quietly and report back to them.", code: "INFORMED_HELP" }, { text: "Tell your partner immediately; you shouldn't carry this alone.", code: "SHARED_BURDEN" }, { text: "Push them to see a therapist; you're worried this is serious.", code: "PARENTAL_OVERRIDE" }, { text: "Listen and support without action; let them lead.", code: "MEET_THEM_THERE" } ] },
-        { q: "You witness someone of a different background being treated unfairly. Speaking up might put your own position at risk in a way you can't afford. Do you:", options: [ { text: "Speak up regardless of the cost; some things are more important.", code: "INTEGRITY_OVER_SAFETY" }, { text: "Stay silent; you have your own family to think about.", code: "PROTECT_SELF" }, { text: "Support them privately while maintaining safety publicly.", code: "STRATEGIC_SUPPORT" }, { text: "Document what you see and share it with someone in a position of power.", code: "INDIRECT_ACTION" }, { text: "Later find ways to work against the unfairness systematically.", code: "LONG_GAME" } ] },
-        { q: "You're in a position to hire someone. Two candidates are equally qualified. One is from an underrepresented group; one is the nephew of the CEO. Who do you hire?", options: [ { text: "The nephew; relationships matter in business.", code: "NETWORKS_PRACTICAL" }, { text: "The underrepresented candidate; diversity is a priority.", code: "CORRECT_IMBALANCES" }, { text: "Either—qualified is qualified; don't over-think it.", code: "MERIT_NEUTRAL" }, { text: "Find a way to hire both; there must be budget somewhere.", code: "SOLVE_CREATIVELY" }, { text: "Choose the underrepresented candidate but feel guilty about the nephew's feelings.", code: "ACKNOWLEDGE_HARM" } ] },
-        { q: "Your research could help millions, but it requires using data that was collected unethically in the past. No new harm would come from using it. Do you:", options: [ { text: "Use it; the potential benefit justifies the past harm.", code: "UTILITARIAN_USE" }, { text: "Refuse; using it perpetuates the original wrong.", code: "PRINCIPLE_OVER_BENEFIT" }, { text: "Use it but dedicate resources to addressing the original harm.", code: "REDEMPTIVE_USE" }, { text: "Only use it with explicit consent from affected communities.", code: "CONSENT_SEEKING" }, { text: "Find alternative data even if it takes longer.", code: "INTEGRITY_SLOWER" } ] },
-        { q: "A family member confesses to you that they committed a crime years ago that hurt someone. They've changed, but the victim still doesn't know. Do you:", options: [ { text: "Tell them to confess; the victim deserves to know.", code: "TRUTH_ABSOLUTE" }, { text: "Encourage them to work toward restitution without full confession.", code: "REDEMPTION_PATH" }, { text: "Keep the secret; they've changed and confessing now just causes new pain.", code: "LET_PAST_REST" }, { text: "Suggest they tell the victim themselves and support them in it.", code: "GUIDED_HONESTY" }, { text: "Feel genuinely torn; there's genuine weight on both sides.", code: "NO_CLEAN_ANSWER" } ] },
-        { q: "You're in a group where everyone agrees with an idea except you, and speaking up would make you look difficult. The idea isn't harmful, just not optimal. Do you:", options: [ { text: "Speak up; the group needs all perspectives.", code: "VOICE_ALWAYS" }, { text: "Stay quiet; harmony matters and you could be wrong anyway.", code: "DEFER_TO_GROUP" }, { text: "Raise concerns privately with the leader afterward.", code: "PRIVATE_DISSENT" }, { text: "Share your perspective but frame it as a question, not a statement.", code: "GENTLE_CHALLENGE" }, { text: "Build a coalition before speaking; you need allies first.", code: "STRATEGIC_ALLIES" } ] },
-        { q: "Someone you love is heading toward a decision that will likely hurt them deeply. You see it coming but they don't. They don't want unsolicited advice. Do you:", options: [ { text: "Tell them anyway; you can't watch them fail silently.", code: "BREAK_BOUNDARY" }, { text: "Respect their autonomy completely; it's their lesson to learn.", code: "HANDS_OFF" }, { text: "Ask permission to share your perspective first.", code: "SEEK_PERMISSION" }, { text: "Plant seeds of doubt through questions rather than statements.", code: "GENTLE_NUDGE" }, { text: "Let them choose, but be there for them when it goes wrong.", code: "SUPPORT_ONLY" } ] },
-        { q: "You discover an error in your favor—financially or professionally. Nobody has noticed yet. Fixing it voluntarily costs you significantly. Do you:", options: [ { text: "Fix it immediately; it's the right thing to do.", code: "INTEGRITY_AUTOMATIC" }, { text: "Keep the advantage; everyone has blind spots, not your responsibility.", code: "EXPLOIT_ADVANTAGE" }, { text: "Wait a reasonable time then mention it casually.", code: "DELAYED_HONESTY" }, { text: "Try to hide it better before someone finds it.", code: "DEEPEN_DECEPTION" }, { text: "Feel conflicted and probably fix it but resent having to.", code: "RESENTFUL_HONESTY" } ] },
-        { q: "You have power to help multiple groups, but resources are limited and priorities conflict. Each choice helps one group but disadvantages another. Do you:", options: [ { text: "Choose the mathematically largest impact; numbers don't lie.", code: "UTILITARIAN_MATH" }, { text: "Help the most marginalized; justice is about evening scales.", code: "EQUITY_FOCUS" }, { text: "Distribute equally even if it means suboptimal results.", code: "EQUAL_SHARE" }, { text: "Choose based on who asked first or who you know best.", code: "RELATIONAL_CHOICE" }, { text: "Try to find a creative solution that doesn't require choosing.", code: "REJECT_FALSE_DILEMMA" } ] }
-    ];
-    const [idx, setIdx] = useState(0);
-    const [answers, setAnswers] = useState<string[]>([]);
-    const [shuffledOptions, setShuffledOptions] = useState<any[]>([]);
-    
-    useEffect(() => { 
-        if (idx < baseDilemmas.length) setShuffledOptions(shuffleArray(baseDilemmas[idx].options)); 
-    }, [idx]);
-
-    // Calculate consistency between related dilemmas
-    const calculateConsistency = (newAnswers: string[]) => {
-        // Map dilemmas to value dimensions
-        const valuePatterns: Record<string, string[]> = {
-            'integrity': ['INTEGRITY_OVER_SAFETY', 'INTEGRITY_AUTOMATIC', 'PRINCIPLE_OVER_BENEFIT', 'TRUTH_ABSOLUTE'],
-            'pragmatism': ['STRATEGIC_DISTANCE', 'PRACTICAL_GENEROSITY', 'STRATEGIC_INSIDER', 'STRATEGIC_ALLIES'],
-            'empathy': ['COMPASSION_FIRST', 'EMPATHY_85+', 'PRESENCE_MATTERS', 'MEET_THEM_THERE']
-        };
-        
-        const consistencyScore: Record<string, number> = {};
-        for (const [dimension, codes] of Object.entries(valuePatterns)) {
-            const matches = newAnswers.filter(code => codes.includes(code)).length;
-            consistencyScore[dimension] = (matches / codes.length) * 100;
-        }
-        
-        return consistencyScore;
-    };
-
-    // Calculate confidence intervals for substat scores
-    const calculateConfidenceIntervals = (substatScores: Record<string, number[]>) => {
-        const ci: Record<string, { mean: number; margin: number; low: number; high: number }> = {};
-        
-        for (const [substat, scores] of Object.entries(substatScores)) {
-            const mean = scores.reduce((a, b) => a + b, 0) / scores.length;
-            const variance = scores.reduce((sum, x) => sum + Math.pow(x - mean, 2), 0) / scores.length;
-            const stdDev = Math.sqrt(variance);
-            // 95% CI: ±1.96 * (stdDev / sqrt(n))
-            const margin = scores.length > 1 ? 1.96 * (stdDev / Math.sqrt(scores.length)) : 10;
-            
-            ci[substat] = {
-                mean,
-                margin,
-                low: Math.max(0, mean - margin),
-                high: Math.min(100, mean + margin)
-            };
-        }
-        
-        return ci;
-    };
-
-    const handleSelect = (code: string) => {
-        const newAnswers = [...answers, code];
-        if (idx >= baseDilemmas.length - 1) {
-            // Score all dilemma answers
-            const substatScores: Record<string, number[]> = {};
-            
-            newAnswers.forEach(answerCode => {
-                const mapping = answerSubstatMap[answerCode] || {};
-                Object.entries(mapping).forEach(([substat, score]) => {
-                    if (!substatScores[substat]) substatScores[substat] = [];
-                    substatScores[substat].push(score);
-                });
-            });
-            
-            // Average scores for each substat
-            const avgScores: Record<string, number> = {};
-            Object.entries(substatScores).forEach(([substat, scores]) => {
-                avgScores[substat] = scores.reduce((a, b) => a + b, 0) / scores.length;
-            });
-            
-            // Calculate consistency & confidence intervals
-            const consistency = calculateConsistency(newAnswers);
-            const confidenceIntervals = calculateConfidenceIntervals(substatScores);
-            
-            // Build value profile based on high-scoring substats
-            const valueProfile: Record<string, string> = {};
-            const sortedScores = Object.entries(avgScores).sort((a, b) => b[1] - a[1]);
-            
-            // Map top substats to value dimensions
-            const valueMapping: Record<string, string> = {
-                'Conviction': 'Integrity-driven',
-                'Purpose': 'Purpose-oriented',
-                'Empathy': 'Compassionate',
-                'Resilience': 'Resilient',
-                'Charisma': 'Charismatic',
-                'Reason': 'Rational/Analytical',
-            };
-            
-            const topValues = sortedScores.slice(0, 3).map(([substat, score]) => `${valueMapping[substat] || substat} (${Math.round(score)}%)`);
-            const primaryProfile = topValues.join(' + ') || 'Balanced';
-            
-            // Detect outliers (low conviction, high empathy, etc. = certain archetypes)
-            const lowConviction = avgScores.Conviction < 40;
-            const highEmpathy = avgScores.Empathy > 70;
-            const highReason = avgScores.Reason > 70;
-            
-            let archetype = 'Balanced Pragmatist';
-            if (highEmpathy && lowConviction) archetype = 'Empathic Relativist';
-            if (highEmpathy && !lowConviction) archetype = 'Compassionate Idealist';
-            if (highReason && lowConviction) archetype = 'Skeptical Analyst';
-            if (highReason && !lowConviction) archetype = 'Principled Strategist';
-            
-            onComplete({ 
-                spiritDilemmas: newAnswers,
-                dilemmaScores: avgScores,
-                dilemmaConsistency: consistency,
-                dilemmaConfidence: confidenceIntervals,
-                valueProfile: {
-                    topValues,
-                    primaryProfile,
-                    archetype
-                }
-            });
-        } else { 
-            setAnswers(newAnswers); 
-            setIdx(idx + 1); 
-        }
-    };
-    return (
-        <TerminalShell title="Moral Architecture // Spirit Calibration">
-            <div className="flex flex-col items-center py-2 text-center flex-grow gap-4">
-                <Scales className="text-purple-500 flex-shrink-0" size={28} />
-                
-                {/* Progress indicator - responsive */}
-                <div className="mb-2 flex justify-center gap-0.5 flex-wrap">
-                    {Array.from({ length: baseDilemmas.length }).map((_, i) => (
-                        <div key={i} className={`rounded-full transition-all ${i <= idx ? 'bg-purple-500 shadow-[0_0_30px_#a855f7] w-2 h-2' : 'bg-gray-800 w-1.5 h-1.5'}`} />
-                    ))}
-                </div>
-                
-                {/* Question text - responsive sizing */}
-                <div className="flex-grow flex flex-col justify-center w-full px-2 sm:px-4">
-                    <p className="text-xs sm:text-sm lg:text-base text-white font-serif italic mb-4 sm:mb-6 leading-relaxed">
-                        "{baseDilemmas[idx].q}"
-                    </p>
-                    
-                    {/* Options - responsive grid */}
-                    <div className="w-full space-y-1.5 sm:space-y-2 overflow-y-auto max-h-[300px] sm:max-h-[350px] pr-2 custom-scrollbar">
-                        {shuffledOptions.map(opt => (
-                            <button 
-                                key={opt.code} 
-                                onClick={() => handleSelect(opt.code)} 
-                                className="w-full bg-gray-900/40 border border-gray-800 p-2 sm:p-3 text-gray-300 hover:text-white hover:border-purple-500 active:bg-purple-600/40 transition-all font-bold uppercase tracking-widest text-[7px] sm:text-[9px] text-left flex justify-between items-start group rounded-sm"
-                            >
-                                <span className="flex-grow pr-2 text-left leading-tight">{opt.text}</span>
-                                <ChevronRight size={12} className="opacity-0 sm:group-hover:opacity-100 transition-opacity flex-shrink-0 mt-0.5" />
-                            </button>
-                        ))}
-                    </div>
-                </div>
-            </div>
-        </TerminalShell>
-    );
-};
-
 // --- ENGINE: SYSTEM EQUILIBRIUM (SYSTEMIC REASONING) ---
 const EquilibriumReasoningTask: React.FC<{ onComplete: (data: any) => void }> = ({ onComplete }) => {
     // Advanced reasoning question bank - IQ-based, multi-domain
@@ -869,9 +605,9 @@ const EquilibriumReasoningTask: React.FC<{ onComplete: (data: any) => void }> = 
             <div className="flex flex-col items-center justify-center text-center flex-grow py-8 sm:py-12 space-y-6 sm:space-y-8">
                 <BrainCircuit className="w-16 sm:w-20 h-16 sm:h-20 text-purple-500 animate-pulse" />
                 <h2 className="text-xl sm:text-2xl font-black font-orbitron text-white uppercase tracking-[0.2em]">LOGIC REASONING CALIBRATION</h2>
-                <div className="bg-gray-900/40 p-4 sm:p-6 border border-gray-800 rounded-sm max-w-sm text-left text-xs sm:text-sm space-y-3">
-                    <p className="text-gray-400 font-mono"><span className="text-cyan-400 font-bold">Protocol:</span> {TOTAL_ROUNDS} questions testing logic, math, pattern recognition, and reasoning.</p>
-                    <p className="text-gray-500 font-mono italic text-[10px] sm:text-xs">"Answer each question as best you can. Your complete reasoning profile will be revealed in your final dossier."</p>
+                <div className="bg-gray-900 p-4 sm:p-6 border border-gray-700 rounded-sm max-w-sm text-left text-xs sm:text-sm space-y-3">
+                    <p className="text-gray-300 font-mono"><span className="text-cyan-400 font-bold">Protocol:</span> {TOTAL_ROUNDS} questions testing logic, math, pattern recognition, and reasoning.</p>
+                    <p className="text-gray-400 font-mono italic text-[10px] sm:text-xs">"Answer each question as best you can. Your complete reasoning profile will be revealed in your final dossier."</p>
                 </div>
                 <button onClick={handleStart} className="btn-primary w-full max-w-xs font-orbitron tracking-[0.3em] py-4 sm:py-5 uppercase text-xs sm:text-sm">BEGIN CALIBRATION</button>
             </div>
@@ -902,9 +638,9 @@ const EquilibriumReasoningTask: React.FC<{ onComplete: (data: any) => void }> = 
                                     className={`w-full border p-2 sm:p-4 rounded-sm text-left flex items-center gap-2 sm:gap-3 transition-all text-xs sm:text-sm font-mono font-bold uppercase tracking-widest ${
                                         phase === 'feedback'
                                             ? isSelected
-                                                ? 'bg-gray-900/40 border-gray-700 text-gray-400'
-                                                : 'bg-gray-900/40 border-gray-700 text-gray-400'
-                                            : 'bg-gray-900/80 border-gray-700 text-gray-300 hover:bg-purple-600/40 hover:border-purple-400 hover:text-white active:bg-purple-600/60'
+                                                ? 'bg-gray-900 border-gray-700 text-gray-300'
+                                                : 'bg-gray-900 border-gray-700 text-gray-300'
+                                            : 'bg-gray-800 border-gray-700 text-gray-200 hover:bg-purple-600/40 hover:border-purple-400 hover:text-white active:bg-purple-600/60'
                                     }`}
                                 >
                                     <span className="w-6 h-6 sm:w-8 sm:h-8 rounded border flex items-center justify-center text-[10px] sm:text-xs font-black flex-shrink-0">
@@ -1127,7 +863,7 @@ const CreativeProtocolTest: React.FC<{ onComplete: (data: any) => void }> = ({ o
                     PROMPT {currentPromptIndex + 1} / {totalPrompts}
                 </div>
                 
-                <div className="bg-gray-900/40 p-3 sm:p-6 border border-amber-900/30 rounded-sm max-w-2xl text-left space-y-3 sm:space-y-4 flex-shrink-0">
+                <div className="bg-gray-900 p-3 sm:p-6 border border-amber-900/30 rounded-sm max-w-2xl text-left space-y-3 sm:space-y-4 flex-shrink-0">
                     <div className="space-y-2">
                         <h3 className="text-amber-400 font-bold font-orbitron uppercase tracking-widest text-sm sm:text-base">
                             {currentPrompt.substat}
@@ -1135,7 +871,7 @@ const CreativeProtocolTest: React.FC<{ onComplete: (data: any) => void }> = ({ o
                         <p className="text-gray-300 italic text-xs sm:text-sm">{currentPrompt.definition}</p>
                     </div>
                     
-                    <div className="bg-black/40 border border-gray-700 p-3 sm:p-4 rounded">
+                    <div className="bg-gray-800 border border-gray-700 p-3 sm:p-4 rounded">
                         <p className="text-white font-serif text-sm sm:text-base leading-relaxed">
                             "{currentPrompt.prompt}"
                         </p>
@@ -1206,7 +942,7 @@ const CreativeProtocolTest: React.FC<{ onComplete: (data: any) => void }> = ({ o
                         value={response}
                         onChange={(e) => setResponse(e.target.value)}
                         placeholder="Share your thoughts..."
-                        className="w-full flex-grow bg-black/80 border border-amber-500/30 rounded-sm p-4 text-white font-mono text-sm focus:border-amber-500 outline-none resize-none transition-all min-h-[200px]"
+                        className="w-full flex-grow bg-gray-800 border border-amber-500/30 rounded-sm p-4 text-white font-mono text-sm focus:border-amber-500 outline-none resize-none transition-all min-h-[200px]"
                     />
                     
                     {/* Word count & controls */}
@@ -1401,11 +1137,11 @@ const AdaptiveKnowledgeTest: React.FC<{ onComplete: (data: any) => void }> = ({ 
                 <Book className="w-20 h-20 text-purple-500 animate-pulse" />
                 <div className="space-y-4">
                     <h2 className="text-2xl font-black font-orbitron text-white uppercase tracking-[0.2em]">ADAPTIVE KNOWLEDGE TEST</h2>
-                    <div className="bg-gray-900/40 p-6 border border-gray-800 rounded-sm max-w-sm text-left">
-                        <p className="text-gray-400 font-mono text-[10px] leading-relaxed uppercase">
+                    <div className="bg-gray-900 p-6 border border-gray-700 rounded-sm max-w-sm text-left">
+                        <p className="text-gray-300 font-mono text-[10px] leading-relaxed uppercase">
                             <span className="text-cyan-400 font-bold">Protocol:</span> {TOTAL_ROUNDS} questions across multiple domains. Answer as accurately as you can.
                         </p>
-                        <p className="text-gray-500 font-mono text-[10px] leading-relaxed mt-4 italic">
+                        <p className="text-gray-400 font-mono text-[10px] leading-relaxed mt-4 italic">
                             "Your comprehensive knowledge profile will be analyzed in your final dossier."
                         </p>
                     </div>
@@ -1438,7 +1174,7 @@ const AdaptiveKnowledgeTest: React.FC<{ onComplete: (data: any) => void }> = ({ 
                             onKeyDown={handleKeyDown}
                             disabled={phase === 'feedback'}
                             placeholder="Type your answer..."
-                            className={`w-full bg-gray-900/80 border p-4 text-lg font-mono text-center transition-all focus:outline-none focus:ring-2 focus:ring-purple-500 ${
+                            className={`w-full bg-gray-800 border p-4 text-lg font-mono text-center transition-all focus:outline-none focus:ring-2 focus:ring-purple-500 ${
                                 'border-gray-700 text-white hover:border-purple-500'
                             }`}
                             autoComplete="off"
@@ -1719,7 +1455,7 @@ const StrategyAssessment3Part: React.FC<{ onComplete: (data: any) => void }> = (
             <div className="flex flex-col items-center justify-center text-center flex-grow py-12 space-y-8">
                 <div className="text-5xl">🧭</div>
                 <h2 className="text-2xl font-black font-orbitron text-cyan-400 uppercase tracking-[0.2em]">STRATEGY MATRIX QUICK</h2>
-                <div className="bg-gray-900/40 p-6 border border-cyan-900/30 rounded-sm max-w-2xl text-left space-y-4">
+                <div className="bg-gray-900 p-6 border border-cyan-900/30 rounded-sm max-w-2xl text-left space-y-4">
                     <p className="text-gray-300 text-sm"><span className="text-cyan-400 font-bold">Protocol:</span> Quick 3-part assessment of strategic thinking (10 min max).</p>
                     <div className="grid grid-cols-3 gap-4 mt-4 text-xs">
                         <div className="bg-cyan-900/20 p-3 border border-cyan-700/30 rounded">
@@ -1741,7 +1477,7 @@ const StrategyAssessment3Part: React.FC<{ onComplete: (data: any) => void }> = (
     if (phase === 'part1_input') return (
         <TerminalShell title="Strategic Engine // Part 1: Logic Puzzle" accentClass="border-yellow-900/50">
             <div className="flex flex-col h-full gap-4">
-                <div className="w-full bg-gray-900 h-1 rounded-full"><div className="bg-yellow-500 h-full w-[33%] rounded-full transition-all" /></div>
+                <div className="w-full bg-gray-800 h-1 rounded-full"><div className="bg-yellow-500 h-full w-[33%] rounded-full transition-all" /></div>
                 <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-sm p-4">
                     <h3 className="text-yellow-400 font-orbitron uppercase tracking-widest text-sm font-bold mb-2">🧩 {quickLogicPuzzle.title}</h3>
                     <p className="text-gray-400 text-xs italic">Tests strategic thinking & logic (quick mental puzzle).</p>
@@ -1764,7 +1500,7 @@ const StrategyAssessment3Part: React.FC<{ onComplete: (data: any) => void }> = (
     if (phase === 'part1_feedback' && riverFeedback) return (
         <TerminalShell title="Strategic Engine // Part 1 Results" accentClass="border-yellow-900/50">
             <div className="flex flex-col h-full gap-4">
-                <div className="w-full bg-gray-900 h-1 rounded-full"><div className="bg-yellow-500 h-full w-[33%] rounded-full" /></div>
+                <div className="w-full bg-gray-800 h-1 rounded-full"><div className="bg-yellow-500 h-full w-[33%] rounded-full" /></div>
                 <div className="space-y-3">
                     <div className="text-center">
                         <div className="text-3xl font-bold text-yellow-400 mb-1">{riverFeedback.score}/30</div>
@@ -1787,8 +1523,8 @@ const StrategyAssessment3Part: React.FC<{ onComplete: (data: any) => void }> = (
             <div className="flex flex-col items-center justify-center text-center flex-grow py-12 space-y-8">
                 <div className="text-5xl">♔</div>
                 <h2 className="text-xl font-black font-orbitron text-green-400 uppercase tracking-[0.2em]">CHESS TACTIC</h2>
-                <div className="w-full bg-gray-900 h-1 rounded-full"><div className="bg-green-500 h-full w-[67%] rounded-full" /></div>
-                <div className="bg-gray-900/40 p-6 border border-green-900/30 rounded-sm max-w-2xl text-left space-y-4">
+                <div className="w-full bg-gray-800 h-1 rounded-full"><div className="bg-green-500 h-full w-[67%] rounded-full" /></div>
+                <div className="bg-gray-900 p-6 border border-green-900/30 rounded-sm max-w-2xl text-left space-y-4">
                     <p className="text-gray-300 text-sm"><span className="text-green-400 font-bold">Protocol:</span> One key tactical puzzle testing calculation and candidate moves.</p>
                     <p className="text-gray-400 text-xs italic">Identify the best move for White. Then briefly explain the strategic principle.</p>
                 </div>
@@ -1800,7 +1536,7 @@ const StrategyAssessment3Part: React.FC<{ onComplete: (data: any) => void }> = (
     if (phase === 'part2_puzzle') return (
         <TerminalShell title={`Strategic Engine // Puzzle ${chessPuzzleIndex + 1}/${chessPuzzles.length}`} accentClass="border-green-900/50">
             <div className="flex flex-col h-full gap-4">
-                <div className="w-full bg-gray-900 h-1 rounded-full"><div className="bg-green-500 h-full rounded-full transition-all" style={{ width: `${chessProgress}%` }} /></div>
+                <div className="w-full bg-gray-800 h-1 rounded-full"><div className="bg-green-500 h-full rounded-full transition-all" style={{ width: `${chessProgress}%` }} /></div>
                 <div className="bg-green-500/10 border border-green-500/30 rounded-sm p-4">
                     <h3 className="text-green-400 font-orbitron uppercase tracking-widest text-sm font-bold mb-2">{currentChessPuzzle.title}</h3>
                     <p className="text-gray-400 text-xs italic">{currentChessPuzzle.description}</p>
@@ -1836,7 +1572,7 @@ const StrategyAssessment3Part: React.FC<{ onComplete: (data: any) => void }> = (
     if (phase === 'part3_input') return (
         <TerminalShell title="Strategic Engine // Part 3: Decision Scenario" accentClass="border-purple-900/50">
             <div className="flex flex-col h-full gap-4">
-                <div className="w-full bg-gray-900 h-1 rounded-full"><div className="bg-purple-500 h-full w-[100%] rounded-full" /></div>
+                <div className="w-full bg-gray-800 h-1 rounded-full"><div className="bg-purple-500 h-full w-[100%] rounded-full" /></div>
                 <div className="bg-purple-500/10 border border-purple-500/30 rounded-sm p-4">
                     <h3 className="text-purple-400 font-orbitron uppercase tracking-widest text-sm font-bold mb-2">📊 {resourceScenario.title}</h3>
                     <p className="text-gray-400 text-xs italic">Test resource prioritization under constraints.</p>
@@ -1845,7 +1581,7 @@ const StrategyAssessment3Part: React.FC<{ onComplete: (data: any) => void }> = (
                     <p className="text-gray-300 text-sm font-mono">{resourceScenario.prompt}</p>
                     <div className="grid grid-cols-1 gap-3">
                         {resourceScenario.tasks.map(task => (
-                            <div key={task.id} className="bg-gray-900 border border-gray-700 p-3 rounded-sm">
+                            <div key={task.id} className="bg-gray-800 border border-gray-700 p-3 rounded-sm">
                                 <div className="text-sm font-bold text-white flex items-center gap-2">
                                     <input type="radio" name="ranking" value={task.id} checked={resourceRanking[0] === task.id} readOnly className="w-4 h-4" />
                                     <span>[{task.id}]</span> {task.name}
@@ -2126,6 +1862,49 @@ export const OnboardingPage: React.FC = () => {
     const finalizeOnboarding = async (inputs: any) => {
         setIsFinalizing(true);
         try {
+            // Check if user skipped most/all tests (less than 3 completed)
+            const completedTestsCount = Object.keys(inputs).filter(key => 
+                inputs[key] && Object.keys(inputs[key]).length > 0
+            ).length;
+            
+            // If user skipped most tests, use predetermined stats
+            if (completedTestsCount < 3) {
+                console.log('⚡ User skipped screening - using predetermined Abas profile stats');
+                
+                // Use predetermined stats with fresh timestamps
+                const predeterminedStatsWithTimestamps = PREDETERMINED_STATS.map(s => ({
+                    ...s,
+                    lastIncreased: new Date().toISOString(),
+                    subStats: s.subStats.map(ss => ({
+                        ...ss,
+                        lastIncreased: new Date().toISOString()
+                    }))
+                }));
+                
+                // Create calibration report using predetermined values
+                const predeterminedReport: FullCalibrationReport = {
+                    ...DEFAULT_CALIBRATION_REPORT,
+                    codename: generateCodename(gameState?.userName || 'Asset'),
+                    initialStatsSnapshot: predeterminedStatsWithTimestamps,
+                    traitScores: {
+                        IP: 85, // Intellectual Potential
+                        LE: 82, // Learning Efficiency
+                        RE: 75, // Resilience
+                        FO: 80, // Focus
+                        EX: 70, // Expression/Creativity
+                        CO: 78  // Composure
+                    },
+                    biometrics: inputs['biometric-data'] || {
+                        dateOfBirth: '', age: null, gender: ''
+                    }
+                };
+                
+                setReport(predeterminedReport);
+                setIsFinalizing(false);
+                return;
+            }
+            
+            // Otherwise, proceed with normal test-based calibration
             const physical = inputs['physical-performance'] || {};
             const breath = inputs['breath-hold-test']?.['vitality-breath-hold'] || {};
             const knowledge = inputs['adaptive-knowledge-test'] || {};
@@ -2135,7 +1914,6 @@ export const OnboardingPage: React.FC = () => {
             const vitality = inputs['vitality-questionnaire'] || {};
             const fittsLaw = inputs['fitts-law-test'] || {};
             const stroop = inputs['resilience-stroop'] || {};
-            const dilemmas = inputs['dilemma-screening'] || {};
             const strategy = inputs['high-stakes-war-room'] || {};
 
             // Extract questionnaire responses for Spirit and Psyche substats
@@ -2355,7 +2133,7 @@ export const OnboardingPage: React.FC = () => {
             
             {/* Skip Confirmation Modal */}
             {showSkipConfirm && (
-                <div className="fixed inset-0 bg-black/80 z-[300] flex items-center justify-center p-4">
+                <div className="fixed inset-0 bg-gray-700 z-[300] flex items-center justify-center p-4">
                     <div className="bg-gray-900 border border-purple-500/30 rounded-sm p-6 max-w-sm w-full space-y-4">
                         <h2 className="text-lg font-orbitron font-bold text-purple-400 uppercase">SKIP OPTIONS</h2>
                         <p className="text-sm text-gray-300">Choose to skip this step or bypass all remaining calibration.</p>
@@ -2421,7 +2199,6 @@ export const OnboardingPage: React.FC = () => {
                 {step.id === 'ai-adaptive-reasoning' && <EquilibriumReasoningTask onComplete={handleStepComplete} />}
                 {step.id === 'adaptive-knowledge-test' && <AdaptiveKnowledgeTest onComplete={handleStepComplete} />}
                 {step.id === 'high-stakes-war-room' && <StrategyAssessment3Part onComplete={handleStepComplete} />}
-                {step.type === 'dilemma-screening' && <DilemmaScreening onComplete={handleStepComplete} />}
                 {step.type === 'creative-protocol-test' && <CreativeProtocolTest onComplete={handleStepComplete} />}
             </div>
         </div>

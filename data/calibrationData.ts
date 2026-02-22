@@ -196,11 +196,6 @@ export const CALIBRATION_BENCHMARKS: CalibrationBenchmark[] = [
         title: 'Inhibition & Resilience Protocol'
     },
     {
-        id: 'dilemma-screening',
-        type: 'dilemma-screening',
-        title: 'Moral Matrix & Spirit Calibration'
-    },
-    {
         id: 'creative-protocol-test',
         type: 'creative-protocol-test',
         title: 'Creative Protocol: Sport & Game Design'

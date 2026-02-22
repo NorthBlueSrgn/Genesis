@@ -46,7 +46,7 @@ const UplinkPage: React.FC = () => {
                     </h1>
                 </div>
 
-                <div className="flex items-center gap-2 bg-black/40 p-1 border border-purple-900/40">
+                <div className="flex items-center gap-2 bg-gray-800 p-1 border border-purple-900/40">
                     <button 
                         onClick={() => setViewMode('editor')}
                         className={`flex items-center gap-2 px-6 py-2 text-[10px] font-black uppercase tracking-widest transition-all ${viewMode === 'editor' ? 'bg-purple-600 text-white shadow-[0_0_20px_rgba(168,85,247,0.4)]' : 'text-gray-600 hover:text-gray-300'}`}
@@ -110,7 +110,7 @@ const UplinkPage: React.FC = () => {
             ) : (
                 /* ARCHIVE VIEW - Intelligence Search */
                 <div className="animate-in fade-in duration-500 space-y-8">
-                    <div className="bg-black/60 border border-purple-900/30 p-5 flex items-center gap-6 rounded-sm">
+                    <div className="bg-gray-700 border border-purple-900/30 p-5 flex items-center gap-6 rounded-sm">
                         <Search className="text-purple-600" />
                         <input 
                             type="text" 
