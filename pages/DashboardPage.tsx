@@ -7,6 +7,9 @@ import Card from '../components/ui/Card';
 import CompanionMessage from '../components/CompanionMessage';
 import SubstatLabel from '../components/SubstatLabel';
 import DecayStatusWidget from '../components/DecayStatusWidget';
+import DecayRecoveryWidget from '../components/DecayRecoveryWidget';
+import SmartTaskSuggestionsWidget from '../components/SmartTaskSuggestionsWidget';
+import AnalyticsDashboardWidget from '../components/AnalyticsDashboardWidget';
 import { RANKS, ATTRIBUTE_RANKS, RANK_PERCENTILES } from '../constants';
 import { Stat, StatName, SubStatName, Task, TaskType, AttributeRankName } from '../types';
 import { ArrowRight, Activity, TrendingUp, Flame, Calendar, BarChart, Crosshair, Check, Zap, ListChecks, Shield, PenLine, Headphones, Binary, Cloud, Clock, FileText, ChevronRight, LayoutGrid, Globe, Languages, Plus } from 'lucide-react';
@@ -187,7 +190,7 @@ const ResetCountdown: React.FC = () => {
 };
 
 const DashboardPage: React.FC = () => {
-    const { gameState, isLoading, completeTask, incrementWeeklyTask } = useGameState();
+    const { gameState, isLoading, completeTask, incrementWeeklyTask, addToast } = useGameState();
     const [tacticalAdvice, setTacticalAdvice] = useState<{ title: string; suggestions: string[] } | null>(null);
     const [loadingAdvice, setLoadingAdvice] = useState(false);
     const [isScrolled, setIsScrolled] = useState(false);
@@ -203,36 +206,47 @@ const DashboardPage: React.FC = () => {
             const cacheKey = `genesis_tactical_advice_${gameState.userName}`;
             const cached = localStorage.getItem(cacheKey);
             if (cached) {
-                setTacticalAdvice(JSON.parse(cached));
+                try {
+                    setTacticalAdvice(JSON.parse(cached));
+                } catch (e) {
+                    console.warn('[DashboardPage] Failed to parse cached tactical advice:', e);
+                }
             } else {
                 setLoadingAdvice(true);
-                generateTacticalSuggestions(gameState.stats, gameState.archetypeTitle || 'Average')
+                generateTacticalSuggestions(gameState.stats ?? [], gameState.archetypeTitle || 'Average')
                     .then(advice => {
                         setTacticalAdvice(advice);
                         localStorage.setItem(cacheKey, JSON.stringify(advice));
                     })
+                    .catch(e => console.error('[DashboardPage] Failed to generate tactical advice:', e))
                     .finally(() => setLoadingAdvice(false));
             }
         }
     }, [gameState]);
 
+    // useMemo must be called unconditionally before any early returns (Rules of Hooks).
+    const lastActivityDate = (gameState?.statHistory?.length ?? 0) > 0
+        ? (gameState?.statHistory?.[gameState.statHistory.length - 1]?.date ?? null)
+        : null;
+    const decayInfo = useMemo(
+        () => calculateDecayInfo(lastActivityDate, gameState?.stats ?? []),
+        [lastActivityDate, gameState?.stats]
+    );
+
     if (isLoading || !gameState) return <Loader text="Loading dashboard" />;
 
     const { rank, stats, currentStreak, statHistory, paths, totalImmersionHours } = gameState;
-    const { apexThreatIndex } = calculateScores(stats);
-    const currentRankInfo = RANK_PERCENTILES[rank.name];
-    const nextRank = RANKS[RANKS.findIndex(r => r.name === rank.name) + 1] || null;
-    const nextRankInfo = nextRank ? RANK_PERCENTILES[nextRank.name] : { min: 100 };
-
-    // Calculate decay info based on last activity
-    const lastActivityDate = statHistory.length > 0 ? statHistory[statHistory.length - 1].date : null;
-    const decayInfo = useMemo(() => calculateDecayInfo(lastActivityDate, stats), [lastActivityDate, stats]);
+    const safeStats = stats ?? [];
+    const { apexThreatIndex } = calculateScores(safeStats);
+    const currentRankInfo = RANK_PERCENTILES[rank?.name] ?? { min: 0 };
+    const nextRank = RANKS[RANKS.findIndex(r => r.name === rank?.name) + 1] || null;
+    const nextRankInfo = nextRank ? (RANK_PERCENTILES[nextRank.name] ?? { min: 100 }) : { min: 100 };
 
     const range = nextRankInfo.min - currentRankInfo.min;
     const progress = range > 0 ? ((apexThreatIndex - currentRankInfo.min) / range) * 100 : 100;
 
-    const growthHabits = paths.flatMap(p =>
-        p.tasks
+    const growthHabits = (paths ?? []).flatMap(p =>
+        (p.tasks ?? [])
             .filter(t => !t.isNonNegotiable)
             .map(t => ({ ...t, pathId: p.id, pathName: p.name }))
     );
@@ -285,6 +299,17 @@ const DashboardPage: React.FC = () => {
                     {/* DECAY STATUS WIDGET - HIGH PRIORITY */}
                     <DecayStatusWidget decayInfo={decayInfo} />
 
+                    {/* DECAY RECOVERY WIDGET - If decay is imminent or active */}
+                    {(decayInfo?.isDecayImminent || decayInfo?.isDecayActive) && (
+                        <DecayRecoveryWidget 
+                            decayInfo={decayInfo} 
+                            stats={safeStats}
+                            onRecoveryTaskComplete={(task, bonusXP) => {
+                                addToast(`Recovery task "${task.title}" completed! +${bonusXP}% bonus`, 'success');
+                            }}
+                        />
+                    )}
+
                     {/* CENTRAL anchor */}
                     <Card className="!bg-black/92 border-purple-500/40 shadow-[0_0_22px_rgba(168,85,247,0.25)]">
                         <CompanionMessage />
@@ -305,7 +330,7 @@ const DashboardPage: React.FC = () => {
                                 <Card className="text-center !border-purple-500/70 !bg-black/80 !p-3 md:!p-5 shadow-[0_0_20px_rgba(168,85,247,0.25)] rounded-md">
                                     <TrendingUp className="mx-auto mb-1.5 text-purple-300" size={18} />
                                     <p className="text-lg md:text-2xl font-black font-orbitron text-purple-100">
-                                        {stats.reduce((s, a) => s + a.value, 0).toLocaleString()}
+                                        {safeStats.reduce((s, a) => s + a.value, 0).toLocaleString()}
                                     </p>
                                     <p className="text-[7px] md:text-[9px] text-gray-400 font-bold uppercase tracking-[0.28em] md:tracking-[0.35em] mt-0.5">
                                         Total Volts
@@ -321,7 +346,7 @@ const DashboardPage: React.FC = () => {
                                 <Card className="text-center !border-purple-500/70 !bg-black/80 !p-3 md:!p-5 shadow-[0_0_20px_rgba(168,85,247,0.25)] rounded-md">
                                     <Calendar className="mx-auto mb-1.5 text-purple-300" size={18} />
                                     <p className="text-lg md:text-2xl font-black font-orbitron text-purple-100">
-                                        {new Set(statHistory.map(h => h.date.split('T')[0])).size}
+                                        {new Set((statHistory ?? []).map(h => h.date.split('T')[0])).size}
                                     </p>
                                     <p className="text-[7px] md:text-[9px] text-gray-400 font-bold uppercase tracking-[0.28em] md:tracking-[0.35em] mt-0.5">
                                         Logged Days
@@ -332,6 +357,17 @@ const DashboardPage: React.FC = () => {
                             <NeuralLinguisticSync totalHours={totalImmersionHours} />
 
                             <NeuralPulseHeatmap history={statHistory} />
+
+                            {/* SMART SUGGESTIONS WIDGET */}
+                            <SmartTaskSuggestionsWidget
+                                tasks={growthHabits}
+                                stats={safeStats}
+                                statHistory={statHistory ?? []}
+                                currentStreak={currentStreak ?? 0}
+                                onTaskSelect={(task) => {
+                                    completeTask(growthHabits.find(h => h.id === task.id)?.pathId || '', task.id);
+                                }}
+                            />
 
                             {/* Growth ledger – mobile friendly */}
                             <Card className="!bg-black/92 border-cyan-500/30 relative overflow-hidden rounded-md">
@@ -433,7 +469,7 @@ const DashboardPage: React.FC = () => {
                                                         
                                                         {/* Substat Label - Shows which substat this task affects and progression */}
                                                         {habit.statBoost && (() => {
-                                                            const relevantStat = gameState.stats.find(s => s.name === habit.statBoost.stat);
+                                                            const relevantStat = safeStats.find(s => s.name === habit.statBoost.stat);
                                                             const substatInfo = relevantStat?.subStats.find(ss => ss.name === habit.statBoost.subStat);
                                                             return (
                                                                 <div className="px-3 py-2.5 md:px-4 md:py-3 border-t border-gray-700/30 bg-black/30">
@@ -542,6 +578,15 @@ const DashboardPage: React.FC = () => {
                                     </div>
                                 )}
                             </Card>
+
+                            {/* ANALYTICS DASHBOARD WIDGET */}
+                            <AnalyticsDashboardWidget
+                                stats={safeStats}
+                                statHistory={statHistory ?? []}
+                                currentStreak={currentStreak ?? 0}
+                                totalXP={safeStats.reduce((sum, s) => sum + s.value, 0)}
+                                rank={rank}
+                            />
                         </div>
                     </div>
 

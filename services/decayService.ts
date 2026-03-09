@@ -21,8 +21,9 @@ export interface DecayInfo {
  */
 export const calculateDecayInfo = (
   lastActivityDate: string | null,
-  stats: Stat[]
+  stats: Stat[] | null | undefined
 ): DecayInfo => {
+  const safeStats = stats ?? [];
   const now = new Date();
   const THRESHOLD_DAYS = DECAY_CONSTANTS.INACTIVITY_THRESHOLD_DAYS;
   
@@ -47,7 +48,7 @@ export const calculateDecayInfo = (
   const affectedStats: string[] = [];
   const pointsAtRisk: number[] = [];
   
-  stats.forEach(stat => {
+  safeStats.forEach(stat => {
     const decayPoints = DECAY_CONSTANTS.DECAY_POINTS_BY_RANK[stat.rank] || 0;
     
     if (decayPoints > 0) {
